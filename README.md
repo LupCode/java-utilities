@@ -1,4 +1,4 @@
-# Utilities Library
+# Java Utilities Library
 Useful classes that extend the java library.  
 Requires no other library.  
 
