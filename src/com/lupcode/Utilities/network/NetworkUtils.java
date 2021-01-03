@@ -481,7 +481,7 @@ public class NetworkUtils {
 	}
 	
 	public static void sendWakeOnLAN(byte[] targetMacAddress, InetAddress... broadcastAddress) throws IOException {
-		sendWakeOnLAN(targetMacAddress, Arrays.asList(broadcastAddress));
+		sendWakeOnLAN(targetMacAddress, broadcastAddress!=null ? Arrays.asList(broadcastAddress) : null);
 	}
 	
 	public static void sendWakeOnLAN(String targetMacAddress, Collection<InetAddress> broadcastAddress) throws IOException {
