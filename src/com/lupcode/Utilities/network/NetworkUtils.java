@@ -33,6 +33,8 @@ public class NetworkUtils {
 	
 	public static long NETWORK_SCAN_INTERVAL = 1000;
 	
+	public static boolean NETWORK_SCAN_FAST = true;
+	
 	public static int WAKE_ON_LAN_PORT = 9;
 	
 	
@@ -105,7 +107,7 @@ public class NetworkUtils {
 				for(final InetAddress addr : interestedAddresses) {
 					NETWORK_PING_EXECUTOR.execute(new Runnable() { public void run() {
 						try {
-							if(isReachable(addr, NETWORK_REACHABLE_TIMEOUT))
+							if(isReachable(addr, NETWORK_REACHABLE_TIMEOUT, NETWORK_SCAN_FAST))
 								onlineAddresses.add(addr);
 						} catch (Exception e) {
 							e.printStackTrace();
@@ -114,7 +116,7 @@ public class NetworkUtils {
 					} });
 				}
 				if(scanLocalNetwork)
-					onlineAddresses.addAll(getLocalDevices());
+					onlineAddresses.addAll(getLocalDevices(NETWORK_SCAN_FAST));
 				
 				while(running.get() > 0)
 					try { Thread.sleep(10); } catch (Exception e) {}
@@ -251,13 +253,18 @@ public class NetworkUtils {
 	 * Checks if the device with a given address is reachable
 	 * @param address Address that should be checked
 	 * @param timeout Timeout in milliseconds
+	 * @param fast If true only the {@link InetAddress#isReachable(int)} function is used 
+	 * which is faster but more unreliable. If false additionally processes get started 
+	 * that exploit OS features but massively slow down the execution
 	 * @return True if device is reachable at address
 	 */
-	public static boolean isReachable(InetAddress address, int timeout) {
+	public static boolean isReachable(InetAddress address, int timeout, boolean fast) {
 		try {
 			if(address.isReachable(timeout))
 				return true;
 		} catch (Exception ex) {}
+		
+		if(fast) return false;
 		
 		String addr = address.toString();
 		int index = addr.indexOf("/");
@@ -291,20 +298,26 @@ public class NetworkUtils {
 	 * Scans local network and returns a list with the addresses 
 	 * of all found devices
 	 * @param subnet IP prefix for the subnet that should be checked for devices
+	 * @param fast If true only the {@link InetAddress#isReachable(int)} function is used 
+	 * which is faster but more unreliable. If false additionally processes get started 
+	 * that exploit OS features but massively slow down the execution
 	 * @return List of found addresses
 	 */
-	public static Set<InetAddress> getLocalDevices(){
-		return getLocalDevices((byte[]) null);
+	public static Set<InetAddress> getLocalDevices(boolean fast){
+		return getLocalDevices((byte[]) null, fast);
 	}
 	
 	/**
 	 * Scans local network and returns a list with the addresses 
 	 * of all found devices
 	 * @param subnet IP prefix for the subnet that should be checked for devices (e.g. 192.168.0)
+	 * @param fast If true only the {@link InetAddress#isReachable(int)} function is used 
+	 * which is faster but more unreliable. If false additionally processes get started 
+	 * that exploit OS features but massively slow down the execution
 	 * @return List of found addresses
 	 * @throws IllegalArgumentException if the subnet format could not be parsed
 	 */
-	public static Set<InetAddress> getLocalDevices(String subnet) throws IllegalArgumentException {
+	public static Set<InetAddress> getLocalDevices(String subnet, boolean fast) throws IllegalArgumentException {
 		ArrayList<Byte> arr = new ArrayList<>(3);
 		String[] args = subnet.split("\\.");
 		for(String arg : args) {
@@ -318,16 +331,19 @@ public class NetworkUtils {
 		byte[] a = new byte[arr.size()];
 		for(int i=0; i<a.length; i++)
 			a[i] = arr.get(i);
-		return getLocalDevices(a);
+		return getLocalDevices(a, fast);
 	}
 	
 	/**
 	 * Scans local network and returns a list with the addresses 
 	 * of all found devices
 	 * @param subnet IP prefix for the subnet that should be checked for devices
+	 * @param fast If true only the {@link InetAddress#isReachable(int)} function is used 
+	 * which is faster but more unreliable. If false additionally processes get started 
+	 * that exploit OS features but massively slow down the execution
 	 * @return List of found addresses
 	 */
-	public static Set<InetAddress> getLocalDevices(byte[] subnet){
+	public static Set<InetAddress> getLocalDevices(byte[] subnet, final boolean fast){
 		ConcurrentLinkedQueue<InetAddress> foundAddresses = new ConcurrentLinkedQueue<>();
 		int timeout = NETWORK_REACHABLE_TIMEOUT;
 		ConcurrentInteger running = new ConcurrentInteger(0);
@@ -350,7 +366,7 @@ public class NetworkUtils {
 								testIp[testIp.length-1] = b;
 								try {
 									InetAddress addr = InetAddress.getByAddress(testIp);
-									if(!addr.isLoopbackAddress() && isReachable(addr, timeout)) {
+									if(!addr.isLoopbackAddress() && isReachable(addr, timeout, fast)) {
 										foundAddresses.add(addr);
 									}
 								} catch (Exception e) {}
@@ -374,7 +390,7 @@ public class NetworkUtils {
 					NETWORK_PING_EXECUTOR.execute(new Runnable() { public void run() {
 						try {
 							InetAddress addr = InetAddress.getByAddress(testIp);
-							if(!addr.isLoopbackAddress() && isReachable(addr, timeout)) {
+							if(!addr.isLoopbackAddress() && isReachable(addr, timeout, fast)) {
 								foundAddresses.add(addr);
 							}
 						} catch (Exception e) {}
