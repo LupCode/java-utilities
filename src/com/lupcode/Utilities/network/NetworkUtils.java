@@ -16,13 +16,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.Map.Entry;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.lupcode.Utilities.concurrent.ConcurrentInteger;
 import com.lupcode.Utilities.executors.DynamicThreadPoolExecutor;
 import com.lupcode.Utilities.listeners.NetworkListener;
 
@@ -35,7 +34,6 @@ public class NetworkUtils {
 	public static long NETWORK_SCAN_INTERVAL = 1000;
 	
 	public static int WAKE_ON_LAN_PORT = 9;
-	
 	
 	
 	// Byte is bitmap:	3=allOnline, 2=firstOnline, 1=allOffline, 0=firstOffline
@@ -120,10 +118,6 @@ public class NetworkUtils {
 				
 				while(running.get() > 0)
 					try { Thread.sleep(10); } catch (Exception e) {}
-				
-				
-				System.out.println("FOUND: "+onlineAddresses); // TODO REMOVE
-				
 				
 				// Compute changes
 				Set<InetAddress> newOnline = new HashSet<>();
@@ -336,7 +330,7 @@ public class NetworkUtils {
 	public static Set<InetAddress> getLocalDevices(byte[] subnet){
 		ConcurrentLinkedQueue<InetAddress> foundAddresses = new ConcurrentLinkedQueue<>();
 		int timeout = NETWORK_REACHABLE_TIMEOUT;
-		BlockingQueue<Runnable> tasks = new LinkedBlockingQueue<>();
+		ConcurrentInteger running = new ConcurrentInteger(0);
 		try {
 			if(subnet == null || subnet.length == 0) {
 				Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
@@ -345,19 +339,22 @@ public class NetworkUtils {
 					Enumeration<InetAddress> addresses = ni.getInetAddresses();
 					while(addresses.hasMoreElements()) {
 						final InetAddress ownAddr = addresses.nextElement();
+						if(ownAddr == null || ownAddr.isLoopbackAddress()) continue;
 						byte[] ownIp = ownAddr.getAddress();
 						for(int i=0; i<256; i++) {
 							final byte b = (byte)i;
+							running.incrementAndGet();
 							NETWORK_PING_EXECUTOR.execute(new Runnable() {public void run() {
 								byte[] testIp = new byte[ownIp.length];
 								System.arraycopy(ownIp, 0, testIp, 0, testIp.length);
-								testIp[testIp.length-1] = (byte) b;
+								testIp[testIp.length-1] = b;
 								try {
 									InetAddress addr = InetAddress.getByAddress(testIp);
 									if(!addr.isLoopbackAddress() && isReachable(addr, timeout)) {
 										foundAddresses.add(addr);
 									}
 								} catch (Exception e) {}
+								running.decrementAndGet();
 							}});
 						}
 					}
@@ -371,18 +368,22 @@ public class NetworkUtils {
 					for(int i=0; i < v; i++) {
 						ip[ip.length-i-1] = (byte)((x >>> (i*8)) & 255);
 					}
-					try {
-						InetAddress addr = InetAddress.getByAddress(ip);
-						if(!addr.isLoopbackAddress() && isReachable(addr, timeout)) {
-							foundAddresses.add(addr);
-						}
-					} catch (Exception e) {}
+					final byte[] testIp = new byte[ip.length];
+					System.arraycopy(ip, 0, testIp, 0, ip.length);
+					running.incrementAndGet();
+					NETWORK_PING_EXECUTOR.execute(new Runnable() { public void run() {
+						try {
+							InetAddress addr = InetAddress.getByAddress(testIp);
+							if(!addr.isLoopbackAddress() && isReachable(addr, timeout)) {
+								foundAddresses.add(addr);
+							}
+						} catch (Exception e) {}
+						running.decrementAndGet();
+					} });
 				}
 			}
 		} catch (SocketException ex) {}
-		while(!tasks.isEmpty()) {
-			try { Thread.sleep(10); } catch (Exception e) {}
-		}
+		running.awaitZero(); // wait until all tasks have finished
 		return new HashSet<>(foundAddresses);
 	}
 	
