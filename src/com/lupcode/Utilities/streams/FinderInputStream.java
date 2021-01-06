@@ -10,8 +10,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map.Entry;
 
-import com.lupcode.Utilities.streams.UTF8CharInputStream;
-
 /**
  * {@link InputStream} that can find data in stream
  * @author LupCode.com (Luca Vogels)

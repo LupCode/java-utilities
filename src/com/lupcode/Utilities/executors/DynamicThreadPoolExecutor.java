@@ -1,10 +1,12 @@
 package com.lupcode.Utilities.executors;
 
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.ArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Executes tasks by using multiple threads that are lazily initialized.
@@ -18,7 +20,8 @@ public class DynamicThreadPoolExecutor implements Executor {
 	
 	protected AtomicInteger free = new AtomicInteger(0);
 	protected LinkedBlockingQueue<Runnable> tasks = new LinkedBlockingQueue<Runnable>();
-	protected ConcurrentLinkedQueue<Thread> threads = new ConcurrentLinkedQueue<Thread>();
+	protected Lock threadsLock = new ReentrantLock();
+	protected ArrayList<Thread> threads = new ArrayList<Thread>();
 	
 	protected int coreSize, maxSize;
 	protected long keepAlive;
@@ -132,8 +135,7 @@ public class DynamicThreadPoolExecutor implements Executor {
 		tasks.add(command);
 		if(free.get() > 0 || (maxSize > 0 && threads.size() >= maxSize)) return;
 		Thread thread = new Thread(new Runnable() { public void run() {
-			free.incrementAndGet();
-			boolean incremented = true;
+			boolean incremented = false;
 			do {
 				if(!incremented) { incremented=true; free.incrementAndGet(); }
 				try {
@@ -146,9 +148,14 @@ public class DynamicThreadPoolExecutor implements Executor {
 					}
 				} catch (InterruptedException e) {}
 			} while(!tasks.isEmpty() || (!shutdown && threads.size() <= coreSize));
+			if(incremented) { incremented=false; free.decrementAndGet(); }
+			threadsLock.lock();
 			threads.remove(Thread.currentThread());
+			threadsLock.unlock();
 		} });
+		threadsLock.lock();
 		threads.add(thread);
+		threadsLock.unlock();
 		thread.start();
 	}
 
