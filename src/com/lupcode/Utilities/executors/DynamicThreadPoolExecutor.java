@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * A core amount of threads keeps running while additional threads get destructed 
  * after a certain period without work to do
  * @author LupCode.com (Luca Vogels)
- * @since 2020-12-29
+ * @since 2020-01-06
  */
 public class DynamicThreadPoolExecutor implements Executor {
 
@@ -25,6 +25,13 @@ public class DynamicThreadPoolExecutor implements Executor {
 	protected TimeUnit timeUnit;
 	protected boolean shutdown = false;
 	
+	/**
+	 * Creates a dynamic thread pool executor
+	 * @param coreSize Amount of threads that will be kept alive even if no more tasks are available
+	 * @param maxSize Maximum of threads that can run simultaneously (zero or negative for no limit) 
+	 * @param keepAlive Time how long threads should wait for new tasks before they get destructed
+	 * @param timeUnit Time unit for waiting for new tasks
+	 */
 	public DynamicThreadPoolExecutor(int coreSize, int maxSize, long keepAlive, TimeUnit timeUnit) {
 		this.coreSize = coreSize;
 		this.maxSize = maxSize;
@@ -32,33 +39,90 @@ public class DynamicThreadPoolExecutor implements Executor {
 		this.timeUnit = (timeUnit != null ? timeUnit : TimeUnit.MILLISECONDS);
 	}
 	
+	/**
+	 * Returns how many threads are currently in the pool
+	 * @return Amount of threads in pool
+	 */
+	public int getPoolSize() {
+		return threads.size();
+	}
+	
+	/**
+	 * Returns how many threads are currently in use
+	 * @return Amount of threads in use
+	 */
+	public int getActiveCount() {
+		return threads.size() - free.get();
+	}
+	
+	/**
+	 * Returns how many threads are currently waiting for tasks
+	 * @return Amount of threads waiting
+	 */
+	public int getWaitingCount() {
+		return free.get();
+	}
+	
+	/**
+	 * Minimum amount of threads that stay alive even if no more tasks are scheduled
+	 * @return Core amount of threads that stay alive
+	 */
 	public int getCorePoolSize() {
 		return coreSize;
 	}
+	
+	/**
+	 * Sets how many threads will stay alive even after no more tasks are available
+	 * @param coreSize Amount of threads always alive
+	 */
 	public void setCorePoolSize(int coreSize) {
 		this.coreSize = coreSize;
 	}
 	
+	/**
+	 * Returns maximum amount of threads that can run simultaneously. 
+	 * If zero or negative no limit is set
+	 * @return Maximum amount of threads (zero or negative for no limit)
+	 */
 	public int getMaximumPoolSize() {
 		return maxSize;
 	}
+	
+	/**
+	 * Sets maximum amount of threads that can run simultaneously. 
+	 * If zero or negative no limit is set
+	 * @param maxSize Maximum amount of threads (zero or negative for no limit)
+	 */
 	public void setMaximumPoolSize(int maxSize) {
 		this.maxSize = maxSize;
 	}
 	
+	/**
+	 * Returns how long threads wait for new tasks before they get destructed
+	 * @return Time waiting for tasks before destructed
+	 */
 	public long getKeepAliveTime() {
 		return keepAlive;
 	}
-	public void setKeepAliveTime(long keepAlive) {
-		this.keepAlive = Math.max(0, keepAlive);
-	}
 	
+	/**
+	 * Returns the time unit how long threads wait for new tasks
+	 * @return Time unit used for waiting
+	 */
 	public TimeUnit getKeepAliveUnit() {
 		return timeUnit;
 	}
-	public void setKeepAliveUnit(TimeUnit timeUnit) {
+	
+	/**
+	 * Sets how long a thread should wait for new tasks before it gets destructed
+	 * @param keepAlive Time how long thread should wait
+	 * @param timeUnit Time unit of the given keep alive time
+	 */
+	public void setKeepAliveTime(long keepAlive, TimeUnit timeUnit) {
+		this.keepAlive = Math.max(0, keepAlive);
 		this.timeUnit = (timeUnit != null ? timeUnit : TimeUnit.MILLISECONDS);
 	}
+	
 	
 	
 	@Override
