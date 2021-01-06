@@ -43,6 +43,32 @@ public class DynamicThreadPoolExecutor implements Executor {
 	}
 	
 	/**
+	 * Returns how many tasks are waiting to being processed
+	 * @return Amount of waiting tasks
+	 */
+	public int getWaitingTasks() {
+		return tasks.size();
+	}
+	
+	/**
+	 * Removes the tasks from the waiting queue so it will 
+	 * not get executed. Only works if tasks is not already 
+	 * being processed by a thread
+	 * @param task Task that should be removed
+	 * @return True on success
+	 */
+	public synchronized boolean removeTask(Runnable task) {
+		return tasks.remove(task);
+	}
+	
+	/**
+	 * Removes all pending tasks so the do not get executed
+	 */
+	public synchronized void removeAllWaitingTasks() {
+		tasks.clear();
+	}
+	
+	/**
 	 * Returns how many threads are currently in the pool
 	 * @return Amount of threads in pool
 	 */
