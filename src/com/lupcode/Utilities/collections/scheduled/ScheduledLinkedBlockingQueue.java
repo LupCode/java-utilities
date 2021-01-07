@@ -444,7 +444,6 @@ public class ScheduledLinkedBlockingQueue<E> implements ScheduledBlockingQueue<E
 		totalSize++;
 		if(changed) condNewItem.signalAll();
 		lock.writeLock().unlock();
-		System.out.println("ADDED ELEMENT FOR "+time+" ..."); // TODO REMOVE
 		return changed;
 	}
 
