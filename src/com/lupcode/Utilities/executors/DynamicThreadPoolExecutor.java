@@ -1,6 +1,7 @@
 package com.lupcode.Utilities.executors;
 
 import java.util.ArrayList;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -13,13 +14,13 @@ import java.util.concurrent.locks.ReentrantLock;
  * A core amount of threads keeps running while additional threads get destructed 
  * after a certain period without work to do
  * @author LupCode.com (Luca Vogels)
- * @since 2020-01-06
+ * @since 2020-01-07
  */
 public class DynamicThreadPoolExecutor implements Executor {
 
 	
 	protected AtomicInteger free = new AtomicInteger(0);
-	protected LinkedBlockingQueue<Runnable> tasks = new LinkedBlockingQueue<Runnable>();
+	protected BlockingQueue<Runnable> tasks = new LinkedBlockingQueue<>();
 	protected Lock threadsLock = new ReentrantLock();
 	protected ArrayList<Thread> threads = new ArrayList<Thread>();
 	
@@ -46,7 +47,7 @@ public class DynamicThreadPoolExecutor implements Executor {
 	 * Returns how many tasks are waiting to being processed
 	 * @return Amount of waiting tasks
 	 */
-	public int getWaitingTasks() {
+	public int getPendingTasks() {
 		return tasks.size();
 	}
 	
@@ -159,6 +160,10 @@ public class DynamicThreadPoolExecutor implements Executor {
 		if(command == null) throw new NullPointerException("Runnable cannot be null");
 		if(shutdown) throw new IllegalStateException(getClass().getSimpleName()+" is currently shutting down");
 		tasks.add(command);
+		updateThreadPool();
+	}
+	
+	protected void updateThreadPool() {
 		if(free.get() > 0 || (maxSize > 0 && threads.size() >= maxSize)) return;
 		Thread thread = new Thread(new Runnable() { public void run() {
 			boolean incremented = false;
@@ -184,7 +189,6 @@ public class DynamicThreadPoolExecutor implements Executor {
 		threadsLock.unlock();
 		thread.start();
 	}
-
 	
 	/**
 	 * Shuts this pool down so no further tasks will be accepted and waits 
@@ -194,8 +198,10 @@ public class DynamicThreadPoolExecutor implements Executor {
 	public synchronized void shutdown() {
 		shutdown = true;
 		while(!threads.isEmpty()) {
+			threadsLock.lock();
 			for(Thread thr : threads)
 				try { thr.join(); } catch (InterruptedException e) {}
+			threadsLock.unlock();
 		}
 		shutdown = false;
 	}
