@@ -141,10 +141,10 @@ public class ConcurrentBoolean implements Serializable {
      * and must return true in order to finish waiting
      * @throws NullPointerException if the function is null
      */
-    public void await(Function<Boolean, Boolean> func) throws NullPointerException {
+    public synchronized void await(Function<Boolean, Boolean> func) throws NullPointerException {
     	if(func == null) throw new NullPointerException("Function cannot be null");
     	while(!func.apply(get()))
-    		try { wait(); } catch (Exception ex) {}
+    		try { wait(); } catch (Exception ex) { ex.printStackTrace(); }
     }
     
     /**
@@ -156,11 +156,11 @@ public class ConcurrentBoolean implements Serializable {
      * @return Current value
      * @throws NullPointerException if the function is null
      */
-    public boolean await(Function<Boolean, Boolean> func, long timeout) throws NullPointerException {
+    public synchronized boolean await(Function<Boolean, Boolean> func, long timeout) throws NullPointerException {
     	if(func == null) throw new NullPointerException("Function cannot be null");
     	long limit = System.currentTimeMillis()+timeout, budget;
-    	while((budget = limit-System.currentTimeMillis()) > 0 && func.apply(get())) {
-    		try { wait(budget); } catch (Exception ex) {}
+    	while((budget = limit-System.currentTimeMillis()) > 0 && !func.apply(get())) {
+    		try { wait(budget); } catch (Exception ex) { ex.printStackTrace(); }
     	} return get();
     }
 }
