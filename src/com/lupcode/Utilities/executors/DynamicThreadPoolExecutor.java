@@ -215,4 +215,12 @@ public class DynamicThreadPoolExecutor implements Executor {
 		}
 		shutdown = false;
 	}
+	
+	@Override
+	public String toString() {
+		return new StringBuilder(getClass().getSimpleName()).append("{coreSize=").append(coreSize).
+				append("; maxSize=").append(maxSize).append("; threads=").append(threads.size()).
+				append(" (active=").append(getActiveCount()).append(" free=").append(free.get()).
+				append("); pendingTasks=").append(tasks.size()).append("}").toString();
+	}
 }

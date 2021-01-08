@@ -55,8 +55,9 @@ public class DynamicScheduledThreadPoolExecutor extends DynamicThreadPoolExecuto
 	 * @param duration Milliseconds after which the task should be executed
 	 * @param command Task that should be executed
 	 */
-	public void executeIn(long duration, Runnable command) {
+	public synchronized void executeIn(long duration, Runnable command) {
 		if(command == null) throw new NullPointerException("Runnable cannot be null");
+		if(shutdown) throw new IllegalStateException(getClass().getSimpleName()+" is currently shutting down");
 		((ScheduledBlockingQueue<Runnable>)this.tasks).addIn(duration, command);
 		updateThreadPool();
 	}
@@ -68,8 +69,9 @@ public class DynamicScheduledThreadPoolExecutor extends DynamicThreadPoolExecuto
 	 * @param time System time in milliseconds when task should be executed
 	 * @param command Task that should be executed
 	 */
-	public void executeAt(long time, Runnable command) {
+	public synchronized void executeAt(long time, Runnable command) {
 		if(command == null) throw new NullPointerException("Runnable cannot be null");
+		if(shutdown) throw new IllegalStateException(getClass().getSimpleName()+" is currently shutting down");
 		((ScheduledBlockingQueue<Runnable>)this.tasks).addAt(time, command);
 		updateThreadPool();
 	}
@@ -101,5 +103,14 @@ public class DynamicScheduledThreadPoolExecutor extends DynamicThreadPoolExecuto
 		threads.add(thread);
 		threadsLock.unlock();
 		thread.start();
+	}
+	
+	@Override
+	public String toString() {
+		return new StringBuilder(getClass().getSimpleName()).append("{coreSize=").append(coreSize).
+				append("; maxSize=").append(maxSize).append("; threads=").append(threads.size()).
+				append(" (active=").append(getActiveCount()).append(" free=").append(free.get()).
+				append("); pendingTasks=").append(tasks.size()).append(" (withFuture=").
+				append(getPendingFutureTasks()).append(")").append("}").toString();
 	}
 }
