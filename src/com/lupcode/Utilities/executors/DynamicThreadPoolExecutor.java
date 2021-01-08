@@ -173,6 +173,7 @@ public class DynamicThreadPoolExecutor implements Executor {
 					Runnable task = tasks.poll(keepAlive, timeUnit);
 					if(task != null) {
 						if(incremented) { incremented=false; free.decrementAndGet(); }
+						updateThreadPool();
 						try {
 							task.run();
 						} catch (Exception ex) { ex.printStackTrace(); }

@@ -22,7 +22,15 @@ public class DynamicScheduledThreadPoolExecutor extends DynamicThreadPoolExecuto
 	 */
 	public DynamicScheduledThreadPoolExecutor(int coreSize, int maxSize, long keepAlive, TimeUnit timeUnit) {
 		super(coreSize, maxSize, keepAlive, timeUnit);
+		setCorePoolSize(coreSize);
 		this.tasks = new ScheduledLinkedBlockingQueue<>();
+	}
+	
+	@Override
+	public void setCorePoolSize(int coreSize) {
+		if(coreSize < 1)
+			throw new IllegalArgumentException("Scheduled thread pools need a core pool size of at least one but "+coreSize+" was given");
+		this.coreSize = coreSize;
 	}
 	
 	/**
