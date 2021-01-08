@@ -44,6 +44,15 @@ public class DynamicThreadPoolExecutor implements Executor {
 	}
 	
 	/**
+	 * Returns true if there are any tasks 
+	 * currently waiting to being processed
+	 * @return True if tasks are waiting
+	 */
+	public boolean hasPendingTasks() {
+		return !tasks.isEmpty();
+	}
+	
+	/**
 	 * Returns how many tasks are waiting to being processed
 	 * @return Amount of waiting tasks
 	 */

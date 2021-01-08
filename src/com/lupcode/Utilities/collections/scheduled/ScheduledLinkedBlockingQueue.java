@@ -26,8 +26,8 @@ public class ScheduledLinkedBlockingQueue<E> implements ScheduledBlockingQueue<E
 	protected boolean allowNull = true;
 	protected TreeMap<Long, Queue<E>> elements = new TreeMap<>();
 	protected ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-	protected Condition condNewItem = lock.writeLock().newCondition();
-	protected Condition condNewSpace = lock.writeLock().newCondition();
+	protected Condition condNotEmpty = lock.writeLock().newCondition();
+	protected Condition condNotFull = lock.writeLock().newCondition();
 	
 	/**
 	 * Creates a new queue with unlimited capacity
@@ -60,9 +60,12 @@ public class ScheduledLinkedBlockingQueue<E> implements ScheduledBlockingQueue<E
 	 */
 	public void setCapacity(long capacity) {
 		lock.writeLock().lock();
-		this.capacity = capacity;
-		condNewSpace.signalAll();
-		lock.writeLock().unlock();
+		try {
+			this.capacity = capacity;
+			if(totalSize < capacity) condNotFull.signalAll();
+		} finally {
+			lock.writeLock().unlock();
+		}
 	}
 	
 	/**
@@ -103,97 +106,99 @@ public class ScheduledLinkedBlockingQueue<E> implements ScheduledBlockingQueue<E
 	@Override
 	public E remove() throws NoSuchElementException {
 		lock.writeLock().lock();
-		Entry<Long, Queue<E>> first = elements.firstEntry();
-		if(first == null || first.getKey() > System.currentTimeMillis()) {
-			lock.writeLock().unlock();
-			throw new NoSuchElementException();
-		}
 		try {
-			E e = first.getValue().remove();
-			if(first.getValue().isEmpty()) elements.remove(first.getKey());
-			totalSize--;
-			condNewSpace.signalAll();
-			lock.writeLock().unlock();
-			return e;
-		} catch (Exception ex) {
-			elements.remove(first.getKey());
+			Entry<Long, Queue<E>> first = elements.firstEntry();
+			if(first == null || first.getKey() > System.currentTimeMillis())
+				throw new NoSuchElementException();
+			try {
+				E e = first.getValue().remove();
+				if(first.getValue().isEmpty()) elements.remove(first.getKey());
+				totalSize--;
+				if(totalSize < capacity) condNotFull.signalAll();
+				return e;
+			} catch (Exception ex) {
+				elements.remove(first.getKey());
+			}
+			return remove();
+		} finally {
 			lock.writeLock().unlock();
 		}
-		return remove();
 	}
 
 	@Override
 	public E poll() {
 		lock.writeLock().lock();
-		Entry<Long, Queue<E>> first = elements.firstEntry();
-		if(first == null || first.getKey() > System.currentTimeMillis()) {
-			lock.writeLock().unlock();
-			return null;
-		}
 		try {
-			E e = first.getValue().remove();
-			if(first.getValue().isEmpty()) elements.remove(first.getKey());
-			totalSize--;
-			condNewSpace.signalAll();
-			lock.writeLock().unlock();
-			return e;
-		} catch (Exception ex) {
-			elements.remove(first.getKey());
+			Entry<Long, Queue<E>> first = elements.firstEntry();
+			if(first == null || first.getKey() > System.currentTimeMillis())
+				return null;
+			try {
+				E e = first.getValue().remove();
+				if(first.getValue().isEmpty()) elements.remove(first.getKey());
+				totalSize--;
+				if(totalSize < capacity) condNotFull.signalAll();
+				return e;
+			} catch (Exception ex) {
+				elements.remove(first.getKey());
+			}
+			return poll();
+		} finally {
 			lock.writeLock().unlock();
 		}
-		return poll();
 	}
 
 	@Override
 	public E element() throws NoSuchElementException {
 		lock.readLock().lock();
-		Entry<Long, Queue<E>> first = elements.firstEntry();
-		if(first == null || first.getKey() > System.currentTimeMillis()) {
-			lock.readLock().unlock();
-			throw new NoSuchElementException();
-		}
 		try {
-			E e = first.getValue().element();
-			lock.readLock().unlock();
-			return e;
-		} catch (Exception ex) {
-			elements.remove(first.getKey());
+			Entry<Long, Queue<E>> first = elements.firstEntry();
+			if(first == null || first.getKey() > System.currentTimeMillis())
+				throw new NoSuchElementException();
+			try {
+				return first.getValue().element();
+			} catch (Exception ex) {
+				elements.remove(first.getKey());
+			}
+			return element();
+		} finally {
 			lock.readLock().unlock();
 		}
-		return element();
 	}
 
 	@Override
 	public E peek() {
 		lock.readLock().lock();
-		Entry<Long, Queue<E>> first = elements.firstEntry();
-		if(first == null || first.getKey() > System.currentTimeMillis()) {
+		try {
+			Entry<Long, Queue<E>> first = elements.firstEntry();
+			if(first == null || first.getKey() > System.currentTimeMillis())
+				return null;
+			return first.getValue().peek();
+		} finally {
 			lock.readLock().unlock();
-			return null;
 		}
-		E e = first.getValue().peek();
-		lock.readLock().unlock();
-		return e;
 	}
 
 	@Override
 	/** Only amount of elements currently available (not included scheduled elements) */
 	public int size() {
 		lock.readLock().lock();
-		int count = 0;
-		Iterator<Entry<Long, Queue<E>>> it = elements.entrySet().iterator();
-		while(it.hasNext()) {
-			Entry<Long, Queue<E>> entry = it.next();
-			if(entry == null || entry.getValue() == null || entry.getValue().isEmpty()) {
-				it.remove();
-				continue;
+		try {
+			int count = 0;
+			Iterator<Entry<Long, Queue<E>>> it = elements.entrySet().iterator();
+			while(it.hasNext()) {
+				Entry<Long, Queue<E>> entry = it.next();
+				if(entry == null || entry.getValue() == null || entry.getValue().isEmpty()) {
+					it.remove();
+					continue;
+				}
+				if(entry.getKey() <= System.currentTimeMillis()) {
+					count += entry.getValue().size();
+				} else break;
 			}
-			if(entry.getKey() <= System.currentTimeMillis()) {
-				count += entry.getValue().size();
-			} else break;
+			return count;
+		} finally {
+			lock.readLock().unlock();
 		}
-		lock.readLock().unlock();
-		return count;
 	}
 	
 	@Override
@@ -224,54 +229,52 @@ public class ScheduledLinkedBlockingQueue<E> implements ScheduledBlockingQueue<E
 			@Override
 			public synchronized boolean hasNext() {
 				lock.readLock().lock();
-				if(inner != null && inner.hasNext()) {
-					lock.readLock().unlock();
+				try {
+					if(inner != null && inner.hasNext()) return true;
+					if(!outer.hasNext()) {
+						currKey = null;
+						return false;
+					}
+					Entry<Long, Queue<E>> entry = outer.next();
+					if(entry == null || entry.getValue() == null) return hasNext();
+					inner = entry.getValue().iterator();
+					if(!inner.hasNext()) return hasNext();
+					currKey = entry.getKey();
 					return true;
-				}
-				if(!outer.hasNext()) {
-					currKey = null;
+				} finally {
 					lock.readLock().unlock();
-					return false;
 				}
-				Entry<Long, Queue<E>> entry = outer.next();
-				if(entry == null || entry.getValue() == null) {
-					lock.readLock().unlock();
-					return hasNext();
-				}
-				inner = entry.getValue().iterator();
-				if(!inner.hasNext()) {
-					lock.readLock().unlock();
-					return hasNext();
-				}
-				currKey = entry.getKey();
-				lock.readLock().unlock();
-				return true;
 			}
 
 			@Override
 			public synchronized E next() {
 				if(inner == null) return null;
 				lock.readLock().lock();
-				E e = inner.next();
-				lock.readLock().unlock();
-				return e;
+				try {
+					return inner.next();
+				} finally {
+					lock.readLock().unlock();
+				}
 			}
 			
 			@Override
 			public void remove() {
 				if(inner == null) return;
 				lock.writeLock().lock();
-				totalSize--;
-				inner.remove();
-				if(currKey != null) {
-					Queue<E> q = elements.get(currKey);
-					if(q == null || q.isEmpty()) {
-						elements.remove(currKey);
-						currKey = null;
+				try {
+					totalSize--;
+					inner.remove();
+					if(currKey != null) {
+						Queue<E> q = elements.get(currKey);
+						if(q == null || q.isEmpty()) {
+							elements.remove(currKey);
+							currKey = null;
+						}
 					}
+					if(totalSize < capacity) condNotFull.signalAll();
+				} finally {
+					lock.writeLock().unlock();
 				}
-				condNewSpace.signalAll();
-				lock.writeLock().unlock();
 			}
 		};
 	}
@@ -279,25 +282,31 @@ public class ScheduledLinkedBlockingQueue<E> implements ScheduledBlockingQueue<E
 	@Override
 	public Object[] toArray() {
 		lock.readLock().lock();
-		ArrayList<E> list = new ArrayList<>();
-		for(Entry<Long, Queue<E>> entry : elements.entrySet())
-			if(entry.getKey() <= System.currentTimeMillis())
-				list.addAll(entry.getValue());
-			else break;
-		lock.readLock().unlock();
-		return list.toArray();
+		try {
+			ArrayList<E> list = new ArrayList<>();
+			for(Entry<Long, Queue<E>> entry : elements.entrySet())
+				if(entry.getKey() <= System.currentTimeMillis())
+					list.addAll(entry.getValue());
+				else break;
+			return list.toArray();
+		} finally {
+			lock.readLock().unlock();
+		}
 	}
 
 	@Override
 	public <T> T[] toArray(T[] a) {
 		lock.readLock().lock();
-		ArrayList<E> list = new ArrayList<>();
-		for(Entry<Long, Queue<E>> entry : elements.entrySet())
-			if(entry.getKey() <= System.currentTimeMillis())
-				list.addAll(entry.getValue());
-			else break;
-		lock.readLock().unlock();
-		return list.toArray(a);
+		try {
+			ArrayList<E> list = new ArrayList<>();
+			for(Entry<Long, Queue<E>> entry : elements.entrySet())
+				if(entry.getKey() <= System.currentTimeMillis())
+					list.addAll(entry.getValue());
+				else break;
+			return list.toArray(a);
+		} finally {
+			lock.readLock().unlock();
+		}
 	}
 
 	@Override
@@ -310,34 +319,31 @@ public class ScheduledLinkedBlockingQueue<E> implements ScheduledBlockingQueue<E
 				for(Queue<E> q : elements.values())
 					if(q != null && q.contains(o)) { notFound=false; break; }
 				if(notFound) {
-					lock.readLock().unlock();
 					return false;
 				}
 			}
+			return true;
+		} finally {
 			lock.readLock().unlock();
-		} catch (Exception ex) {
-			lock.readLock().unlock();
-			throw ex;
 		}
-		return true;
 	}
 
 	@Override
 	public boolean addAll(Collection<? extends E> c) {
-		return addAllAt(c, System.currentTimeMillis());
+		return addAllAt(System.currentTimeMillis(), c);
 	}
 	
 	@Override
-	public boolean addAllIn(Collection<? extends E> c, long duration) {
-		return addAllAt(c, System.currentTimeMillis() + duration);
+	public boolean addAllIn(long duration, Collection<? extends E> c) {
+		return addAllAt(System.currentTimeMillis() + duration, c);
 	}
 	
 	@Override
-	public boolean addAllAt(Collection<? extends E> c, long time) {
+	public boolean addAllAt(long time, Collection<? extends E> c) {
 		if(c == null || c.isEmpty()) return false;
 		lock.writeLock().lock();
-		boolean changed = false;
 		try {
+			boolean changed = false;
 			Queue<E> q = getQueueForInsert(time);
 			for(E o : c) {
 				if(o == null || !allowNull) throw new NullPointerException("Element cannot be null");
@@ -347,21 +353,19 @@ public class ScheduledLinkedBlockingQueue<E> implements ScheduledBlockingQueue<E
 				totalSize++;
 			}
 			if(q.isEmpty()) elements.remove(time);
-			if(changed) condNewItem.signalAll();
+			if(changed) condNotEmpty.signalAll();
+			return changed;
+		} finally {
 			lock.writeLock().unlock();
-		} catch (Exception ex) {
-			lock.writeLock().unlock();
-			throw ex;
 		}
-		return changed;
 	}
 
 	@Override
 	public boolean removeAll(Collection<?> c) {
 		if(c == null || c.isEmpty()) return false;
 		lock.writeLock().lock();
-		boolean changed = false;
 		try {
+			boolean changed = false;
 			long newTotalSize = 0;
 			Iterator<Entry<Long, Queue<E>>> it = elements.entrySet().iterator();
 			while(it.hasNext()) {
@@ -375,13 +379,11 @@ public class ScheduledLinkedBlockingQueue<E> implements ScheduledBlockingQueue<E
 				if(entry.getValue().isEmpty()) it.remove();
 			}
 			this.totalSize = newTotalSize;
-			if(changed) condNewSpace.signalAll();
+			if(changed && totalSize < capacity) condNotFull.signalAll(); 
+			return changed;
+		} finally {
 			lock.writeLock().unlock();
-		} catch (Exception ex) {
-			lock.writeLock().unlock();
-			throw ex;
 		}
-		return changed;
 	}
 
 	@Override
@@ -392,196 +394,217 @@ public class ScheduledLinkedBlockingQueue<E> implements ScheduledBlockingQueue<E
 			return !isFullyEmpty;
 		}
 		lock.writeLock().lock();
-		long newTotalSize = 0;
-		boolean changed = false;
-		Iterator<Entry<Long, Queue<E>>> it = elements.entrySet().iterator();
-		while(it.hasNext()) {
-			Entry<Long, Queue<E>> entry = it.next();
-			if(entry == null || entry.getValue() == null || entry.getValue().isEmpty()) {
-				it.remove();
-				continue;
+		try {
+			long newTotalSize = 0;
+			boolean changed = false;
+			Iterator<Entry<Long, Queue<E>>> it = elements.entrySet().iterator();
+			while(it.hasNext()) {
+				Entry<Long, Queue<E>> entry = it.next();
+				if(entry == null || entry.getValue() == null || entry.getValue().isEmpty()) {
+					it.remove();
+					continue;
+				}
+				changed |= entry.getValue().retainAll(c);
+				newTotalSize += entry.getValue().size();
+				if(entry.getValue().isEmpty())
+					it.remove();
 			}
-			changed |= entry.getValue().retainAll(c);
-			newTotalSize += entry.getValue().size();
-			if(entry.getValue().isEmpty())
-				it.remove();
+			this.totalSize = newTotalSize;
+			if(changed && totalSize < capacity) condNotFull.signalAll();
+			return changed;
+		} finally {
+			lock.writeLock().unlock();
 		}
-		this.totalSize = newTotalSize;
-		if(changed) condNewSpace.signalAll();
-		lock.writeLock().unlock();
-		return changed;
 	}
 
 	@Override
 	public void clear() {
 		lock.writeLock().lock();
-		elements.clear();
-		totalSize = 0;
-		condNewSpace.signalAll();
-		lock.writeLock().unlock();
+		try {
+			elements.clear();
+			totalSize = 0;
+			condNotFull.signalAll();
+		} finally {
+			lock.writeLock().unlock();
+		}
 	}
 
 	@Override
 	public boolean add(E e) {
-		return addAt(e, System.currentTimeMillis());
+		return addAt(System.currentTimeMillis(), e);
 	}
 	
 	@Override
-	public boolean addIn(E e, long duration) {
-		return addAt(e, System.currentTimeMillis() + duration);
+	public boolean addIn(long duration, E e) {
+		return addAt(System.currentTimeMillis() + duration, e);
 	}
 
 	@Override
-	public boolean addAt(E e, long time) {
+	public boolean addAt(long time, E e) {
 		if(e == null && !allowNull) throw new NullPointerException("Element cannot be null");
 		lock.writeLock().lock();
-		if(capacity > 0 && totalSize > capacity) {
+		try {
+			if(capacity > 0 && totalSize > capacity)
+				throw new IllegalStateException("Maximum capacity of "+capacity+" reached");
+			Queue<E> q = getQueueForInsert(time);
+			boolean changed = q.add(e);
+			totalSize++;
+			if(changed) condNotEmpty.signalAll();
+			return changed;
+		} finally {
 			lock.writeLock().unlock();
-			throw new IllegalStateException("Maximum capacity of "+capacity+" reached");
 		}
-		Queue<E> q = getQueueForInsert(time);
-		boolean changed = q.add(e);
-		totalSize++;
-		if(changed) condNewItem.signalAll();
-		lock.writeLock().unlock();
-		return changed;
 	}
 
 	@Override
 	public boolean offer(E e) {
-		return offerAt(e, System.currentTimeMillis());
+		return offerAt(System.currentTimeMillis(), e);
 	}
 	
 	@Override
-	public boolean offerIn(E e, long duration) {
-		return offerAt(e, System.currentTimeMillis() + duration);
+	public boolean offerIn(long duration, E e) {
+		return offerAt(System.currentTimeMillis() + duration, e);
 	}
 
 	@Override
-	public boolean offerAt(E e, long time) {
+	public boolean offerAt(long time, E e) {
 		if(e == null && !allowNull) throw new NullPointerException("Element cannot be null");
 		lock.writeLock().lock();
-		if(capacity > 0 && totalSize > capacity) {
+		try {
+			if(capacity > 0 && totalSize > capacity) return false;
+			Queue<E> q = getQueueForInsert(time);
+			boolean changed = q.add(e);
+			totalSize++;
+			if(changed) condNotEmpty.signalAll();
+			return changed;
+		} finally {
 			lock.writeLock().unlock();
-			return false;
 		}
-		Queue<E> q = getQueueForInsert(time);
-		boolean changed = q.add(e);
-		totalSize++;
-		if(changed) condNewItem.signalAll();
-		lock.writeLock().unlock();
-		return changed;
 	}
 	
 	@Override
 	public boolean offer(E e, long timeout, TimeUnit unit) throws InterruptedException {
+		return offerAt(System.currentTimeMillis(), e, timeout, unit);
+	}
+	
+	@Override
+	public boolean offerIn(long duration, E e, long timeout, TimeUnit unit) throws InterruptedException {
+		return offerAt(System.currentTimeMillis() + duration, e, timeout, unit);
+	}
+
+	@Override
+	public boolean offerAt(long time, E e, long timeout, TimeUnit unit) throws InterruptedException {
 		if(e == null && !allowNull) throw new NullPointerException("Element cannot be null");
 		timeout = unit.toMillis(timeout);
 		lock.writeLock().lock();
-		long start = System.currentTimeMillis(), wait;
-		boolean full = false;
-		while((full = capacity > 0 && totalSize > capacity) && (wait = timeout-(System.currentTimeMillis()-start)) > 0)
-			condNewSpace.await(wait, unit);
-		if(full) {
+		try {
+			long start = System.currentTimeMillis(), wait;
+			boolean full = false;
+			while((full = capacity > 0 && totalSize >= capacity) && (wait = timeout-(System.currentTimeMillis()-start)) > 0)
+				condNotFull.await(wait, TimeUnit.MILLISECONDS);
+			if(full) return false;
+			Queue<E> q = getQueueForInsert(time);
+			q.add(e);
+			totalSize++;
+			condNotEmpty.signalAll();
+			return true;
+		} finally {
 			lock.writeLock().unlock();
-			return false;
 		}
-		Queue<E> q = getQueueForInsert(System.currentTimeMillis());
-		q.add(e);
-		totalSize++;
-		condNewItem.signalAll();
-		lock.writeLock().unlock();
-		return true;
 	}
 
 	@Override
 	public void put(E e) throws InterruptedException {
-		putAt(e, System.currentTimeMillis());
+		putAt(System.currentTimeMillis(), e);
 	}
 	
 	@Override
-	public void putIn(E e, long duration) throws InterruptedException {
-		putAt(e, System.currentTimeMillis() + duration);
+	public void putIn(long duration, E e) throws InterruptedException {
+		putAt(System.currentTimeMillis() + duration, e);
 	}
 
 	@Override
-	public void putAt(E e, long time) throws InterruptedException {
+	public void putAt(long time, E e) throws InterruptedException {
 		if(e == null && !allowNull) throw new NullPointerException("Element cannot be null");
 		lock.writeLock().lock();
-		while(capacity > 0 && totalSize > capacity)
-			condNewSpace.await();
-		Queue<E> q = getQueueForInsert(time);
-		boolean changed = q.add(e);
-		totalSize++;
-		if(changed) condNewItem.signalAll();
-		lock.writeLock().unlock();
+		try {
+			while(capacity > 0 && totalSize >= capacity)
+				condNotFull.await();
+			Queue<E> q = getQueueForInsert(time);
+			boolean changed = q.add(e);
+			totalSize++;
+			if(changed) condNotEmpty.signalAll();
+		} finally {
+			lock.writeLock().unlock();
+		}
 	}
 
 	@Override
 	public E take() throws InterruptedException {
 		lock.writeLock().lock();
-		Entry<Long, Queue<E>> first = null;
-		do {
-			first = elements.firstEntry();
-			if(first == null) {
-				condNewItem.await();
-				continue;
-			}
-			long now = System.currentTimeMillis();
-			if(first.getKey() > now){
-				condNewItem.await(Math.max(0, first.getKey()-now), TimeUnit.MILLISECONDS);
-				first = null;
-			}
-		} while(first != null);
 		try {
-			@SuppressWarnings("null")
-			E e = first.getValue().remove();
-			if(first.getValue().isEmpty()) elements.remove(first.getKey());
-			totalSize--;
-			condNewSpace.signalAll();
-			lock.writeLock().unlock();
-			return e;
-		} catch (Exception ex) {
-			elements.remove(first.getKey());
+			Entry<Long, Queue<E>> first = null;
+			do {
+				first = elements.firstEntry();
+				if(first == null) {
+					condNotEmpty.await();
+					continue;
+				}
+				long now = System.currentTimeMillis();
+				if(first.getKey() > now){
+					condNotEmpty.await(Math.max(0, first.getKey()-now), TimeUnit.MILLISECONDS);
+					first = null;
+				}
+			} while(first != null);
+			try {
+				@SuppressWarnings("null")
+				E e = first.getValue().remove();
+				if(first.getValue().isEmpty()) elements.remove(first.getKey());
+				totalSize--;
+				if(totalSize < capacity) condNotFull.signalAll();
+				return e;
+			} catch (Exception ex) {
+				elements.remove(first.getKey());
+			}
+			return take();
+		} finally {
 			lock.writeLock().unlock();
 		}
-		return take();
 	}
 
 	@Override
 	public E poll(long timeout, TimeUnit unit) throws InterruptedException {
 		timeout = unit.toMillis(timeout);
 		lock.writeLock().lock();
-		long start = System.currentTimeMillis(), wait;
-		Entry<Long, Queue<E>> first = null;
-		while((wait = timeout-(System.currentTimeMillis()-start)) > 0) {
-			first = elements.firstEntry();
-			if(first == null) {
-				condNewItem.await(wait, unit);
-				continue;
-			}
-			long now = System.currentTimeMillis();
-			if(first.getKey() > now){
-				condNewItem.await(Math.min(wait, first.getKey()-now), TimeUnit.MILLISECONDS);
-				first = null;
-			}
-		}
-		if(first == null) {
-			lock.writeLock().unlock();
-			return null;
-		}
 		try {
-			E e = first.getValue().remove();
-			if(first.getValue().isEmpty()) elements.remove(first.getKey());
-			totalSize--;
-			condNewSpace.signalAll();
-			lock.writeLock().unlock();
-			return e;
-		} catch (Exception ex) {
-			elements.remove(first.getKey());
+			long start = System.currentTimeMillis(), wait;
+			Entry<Long, Queue<E>> first = null;
+			while(first == null && (wait = timeout-(System.currentTimeMillis()-start)) > 0) {
+				first = elements.firstEntry();
+				if(first == null) {
+					condNotEmpty.await(wait, TimeUnit.MILLISECONDS);
+					continue;
+				}
+				long now = System.currentTimeMillis();
+				if(first.getKey() > now){
+					condNotEmpty.await(Math.min(wait, first.getKey()-now), TimeUnit.MILLISECONDS);
+					first = null;
+				}
+			}
+			if(first == null) return null;
+			try {
+				E e = first.getValue().remove();
+				if(first.getValue().isEmpty()) elements.remove(first.getKey());
+				totalSize--;
+				if(totalSize < capacity) condNotFull.signalAll();
+				return e;
+			} catch (Exception ex) {
+				elements.remove(first.getKey());
+			}
+			return null;
+		} finally {
 			lock.writeLock().unlock();
 		}
-		return null;
 	}
 
 	@Override
@@ -592,83 +615,92 @@ public class ScheduledLinkedBlockingQueue<E> implements ScheduledBlockingQueue<E
 	@Override
 	public boolean remove(Object o) {
 		lock.writeLock().lock();
-		Iterator<Entry<Long, Queue<E>>> it = elements.entrySet().iterator();
-		while(it.hasNext()) {
-			Entry<Long, Queue<E>> entry = it.next();
-			if(entry == null || entry.getValue() == null || entry.getValue().isEmpty()) {
-				it.remove();
-				continue;
+		try {
+			Iterator<Entry<Long, Queue<E>>> it = elements.entrySet().iterator();
+			while(it.hasNext()) {
+				Entry<Long, Queue<E>> entry = it.next();
+				if(entry == null || entry.getValue() == null || entry.getValue().isEmpty()) {
+					it.remove();
+					continue;
+				}
+				if(entry.getValue().remove(o)) {
+					if(entry.getValue().isEmpty()) it.remove();
+					totalSize--;
+					if(totalSize < capacity) condNotFull.signalAll();
+					return true;
+				}
 			}
-			if(entry.getValue().remove(o)) {
-				if(entry.getValue().isEmpty()) it.remove();
-				totalSize--;
-				condNewSpace.signalAll();
-				lock.writeLock().unlock();
-				return true;
-			}
+			return false;
+		} finally {
+			lock.writeLock().unlock();
 		}
-		lock.writeLock().unlock();
-		return false;
 	}
 
 	@Override
 	public boolean contains(Object o) {
 		lock.readLock().lock();
-		for(Queue<E> q : elements.values())
-			if(q.contains(o)) {
-				lock.readLock().unlock();
-				return true;
-			}
-		lock.readLock().unlock();
-		return false;
+		try {
+			for(Queue<E> q : elements.values())
+				if(q.contains(o)) return true;
+			return false;
+		} finally {
+			lock.readLock().unlock();
+		}
 	}
 
 	@Override
 	public int drainTo(Collection<? super E> c) {
 		if(c == null) throw new NullPointerException("Collection cannot be null");
 		lock.writeLock().lock();
-		int count = 0;
-		Iterator<Entry<Long, Queue<E>>> it = elements.entrySet().iterator();
-		while(it.hasNext()) {
-			Entry<Long, Queue<E>> entry = it.next();
-			if(entry == null || entry.getValue() == null || entry.getValue().isEmpty()) {
-				it.remove();
-				continue;
+		try {
+			int count = 0;
+			Iterator<Entry<Long, Queue<E>>> it = elements.entrySet().iterator();
+			while(it.hasNext()) {
+				Entry<Long, Queue<E>> entry = it.next();
+				if(entry == null || entry.getValue() == null || entry.getValue().isEmpty()) {
+					it.remove();
+					continue;
+				}
+				if(entry.getKey() <= System.currentTimeMillis()) {
+					c.addAll(entry.getValue());
+					totalSize -= entry.getValue().size();
+					it.remove();
+				} else break;
 			}
-			if(entry.getKey() <= System.currentTimeMillis()) {
-				c.addAll(entry.getValue());
-				totalSize -= entry.getValue().size();
-				it.remove();
-			} else break;
+			if(totalSize < capacity) condNotFull.signalAll();
+			return count;
+		} finally {
+			lock.writeLock().unlock();
 		}
-		if(count > 0) condNewSpace.signalAll();
-		lock.writeLock().unlock();
-		return count;
+		
 	}
 
 	@Override
 	public int drainTo(Collection<? super E> c, int maxElements) {
 		if(c == null) throw new NullPointerException("Collection cannot be null");
 		lock.writeLock().lock();
-		int count = 0;
-		Iterator<Entry<Long, Queue<E>>> it = elements.entrySet().iterator();
-		while(it.hasNext()) {
-			Entry<Long, Queue<E>> entry = it.next();
-			if(entry == null || entry.getValue() == null || entry.getValue().isEmpty()) {
-				it.remove();
-				continue;
-			}
-			if(entry.getKey() <= System.currentTimeMillis()) {
-				while(!entry.getValue().isEmpty() && count < maxElements) {
-					c.add(entry.getValue().remove());
-					count++;
-					totalSize--;
+		try {
+			int count = 0;
+			Iterator<Entry<Long, Queue<E>>> it = elements.entrySet().iterator();
+			while(it.hasNext()) {
+				Entry<Long, Queue<E>> entry = it.next();
+				if(entry == null || entry.getValue() == null || entry.getValue().isEmpty()) {
+					it.remove();
+					continue;
 				}
-				if(entry.getValue().isEmpty()) it.remove();
-			} else break;
+				if(entry.getKey() <= System.currentTimeMillis()) {
+					while(!entry.getValue().isEmpty() && count < maxElements) {
+						c.add(entry.getValue().remove());
+						count++;
+						totalSize--;
+					}
+					if(entry.getValue().isEmpty()) it.remove();
+				} else break;
+			}
+			if(totalSize < capacity) condNotFull.signalAll();
+			return count;
+		} finally {
+			lock.writeLock().unlock();
 		}
-		if(count > 0) condNewSpace.signalAll();
-		lock.writeLock().unlock();
-		return count;
 	}
 }

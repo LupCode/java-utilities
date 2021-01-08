@@ -22,15 +22,23 @@ public class DynamicScheduledThreadPoolExecutor extends DynamicThreadPoolExecuto
 	 */
 	public DynamicScheduledThreadPoolExecutor(int coreSize, int maxSize, long keepAlive, TimeUnit timeUnit) {
 		super(coreSize, maxSize, keepAlive, timeUnit);
-		setCorePoolSize(coreSize);
 		this.tasks = new ScheduledLinkedBlockingQueue<>();
 	}
 	
 	@Override
 	public void setCorePoolSize(int coreSize) {
-		if(coreSize < 1)
-			throw new IllegalArgumentException("Scheduled thread pools need a core pool size of at least one but "+coreSize+" was given");
 		this.coreSize = coreSize;
+	}
+	
+	/**
+	 * Returns true if there are any tasks 
+	 * currently waiting to being processed 
+	 * or waiting to being processed in a future 
+	 * point in time
+	 * @return True if tasks are waiting (including future)
+	 */
+	public boolean hasPendingFutureTasks() {
+		return !((ScheduledBlockingQueue<Runnable>)this.tasks).isCompletelyEmpty();
 	}
 	
 	/**
@@ -44,12 +52,12 @@ public class DynamicScheduledThreadPoolExecutor extends DynamicThreadPoolExecuto
 
 	/**
 	 * Executes a given task after a certain duration
-	 * @param command Task that should be executed
 	 * @param duration Milliseconds after which the task should be executed
+	 * @param command Task that should be executed
 	 */
-	public void executeIn(Runnable command, long duration) {
+	public void executeIn(long duration, Runnable command) {
 		if(command == null) throw new NullPointerException("Runnable cannot be null");
-		((ScheduledBlockingQueue<Runnable>)this.tasks).addIn(command, duration);
+		((ScheduledBlockingQueue<Runnable>)this.tasks).addIn(duration, command);
 		updateThreadPool();
 	}
 	
@@ -57,12 +65,41 @@ public class DynamicScheduledThreadPoolExecutor extends DynamicThreadPoolExecuto
 	 * Executes a task after a certain time. 
 	 * If high utilization it is possible that task 
 	 * will not get executed at exact time point
-	 * @param command Task that should be executed
 	 * @param time System time in milliseconds when task should be executed
+	 * @param command Task that should be executed
 	 */
-	public void executeAt(Runnable command, long time) {
+	public void executeAt(long time, Runnable command) {
 		if(command == null) throw new NullPointerException("Runnable cannot be null");
-		((ScheduledBlockingQueue<Runnable>)this.tasks).addAt(command, time);
+		((ScheduledBlockingQueue<Runnable>)this.tasks).addAt(time, command);
 		updateThreadPool();
+	}
+	
+	@Override
+	protected void updateThreadPool() {
+		if(free.get() > 0 || (maxSize > 0 && threads.size() >= maxSize)) return;
+		Thread thread = new Thread(new Runnable() { public void run() {
+			boolean incremented = false;
+			do {
+				if(!incremented) { incremented=true; free.incrementAndGet(); }
+				try {
+					Runnable task = tasks.poll(keepAlive, timeUnit);
+					if(task != null) {
+						if(incremented) { incremented=false; free.decrementAndGet(); }
+						updateThreadPool();
+						try {
+							task.run();
+						} catch (Exception ex) { ex.printStackTrace(); }
+					}
+				} catch (InterruptedException e) {}
+			} while(!((ScheduledBlockingQueue<Runnable>)tasks).isCompletelyEmpty() || (!shutdown && threads.size() <= coreSize));
+			if(incremented) { incremented=false; free.decrementAndGet(); }
+			threadsLock.lock();
+			threads.remove(Thread.currentThread());
+			threadsLock.unlock();
+		} });
+		threadsLock.lock();
+		threads.add(thread);
+		threadsLock.unlock();
+		thread.start();
 	}
 }

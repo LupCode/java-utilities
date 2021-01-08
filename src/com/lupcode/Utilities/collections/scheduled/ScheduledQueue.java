@@ -29,8 +29,8 @@ public interface ScheduledQueue<E> extends Queue<E> {
 	 * Adds the given element to the collection so that it becomes 
 	 * available after the given duration or throwing an {@code IllegalStateException}
      * if no space is currently available.
+     * @param duration Milliseconds from now after which element should become available
 	 * @param e Element that should be added
-	 * @param duration Milliseconds from now after which element should become available
 	 * @return {@code true} (as specified by {@link Collection#add})
 	 * @throws IllegalStateException if the element cannot be added at this
      *         time due to capacity restrictions
@@ -40,14 +40,14 @@ public interface ScheduledQueue<E> extends Queue<E> {
      * @throws IllegalArgumentException if some property of the specified
      *         element prevents it from being added to this queue
 	 */
-	public boolean addIn(E e, long duration);
+	public boolean addIn(long duration, E e);
 	
 	/**
 	 * Adds the given element to the collection so that it becomes 
 	 * available at the given system time or throwing an {@code IllegalStateException}
      * if no space is currently available.
-	 * @param e Element that should be added
 	 * @param time Time at which the new element should become available
+	 * @param e Element that should be added
 	 * @return {@code true} (as specified by {@link Collection#add})
 	 * @throws IllegalStateException if the element cannot be added at this
      *         time due to capacity restrictions
@@ -57,25 +57,25 @@ public interface ScheduledQueue<E> extends Queue<E> {
      * @throws IllegalArgumentException if some property of the specified
      *         element prevents it from being added to this queue
 	 */
-	public boolean addAt(E e, long time);
+	public boolean addAt(long time, E e);
 	
 	/**
 	 * Adds all elements from collection so that they become 
 	 * available after the given duration 
-	 * @param c Collection of elements that should be added
 	 * @param duration Milliseconds from now after which elements should become available
+	 * @param c Collection of elements that should be added
 	 * @return True if this collection changed as a result of the call
 	 */
-	public boolean addAllIn(Collection<? extends E> c, long duration);
+	public boolean addAllIn(long duration, Collection<? extends E> c);
 	
 	/**
 	 * Adds all elements from collection so that they become 
 	 * available at the given system time
-	 * @param c Collection of elements that should be added
 	 * @param time Time at which new elements should become available
+	 * @param c Collection of elements that should be added
 	 * @return True if this collection changed as a result of the call
 	 */
-	public boolean addAllAt(Collection<? extends E> c, long time);
+	public boolean addAllAt(long time, Collection<? extends E> c);
 	
 	/**
 	 * Adds the given element to the collection so that it becomes 
@@ -83,8 +83,8 @@ public interface ScheduledQueue<E> extends Queue<E> {
 	 * When using a capacity-restricted queue, this method is generally
      * preferable to {@link #add}, which can fail to insert an element only
      * by throwing an exception.
-	 * @param e Element that should be added
 	 * @param duration Milliseconds from now after which element should become available
+	 * @param e Element that should be added
 	 * @return {@code true} if the element was added to this queue, else
      *         {@code false}
      * @throws ClassCastException if the class of the specified element
@@ -93,7 +93,7 @@ public interface ScheduledQueue<E> extends Queue<E> {
      * @throws IllegalArgumentException if some property of the specified
      *         element prevents it from being added to this queue
 	 */
-	public boolean offerIn(E e, long duration);
+	public boolean offerIn(long duration, E e);
 	
 	/**
 	 * Adds the given element to the collection so that it becomes 
@@ -101,8 +101,8 @@ public interface ScheduledQueue<E> extends Queue<E> {
 	 * When using a capacity-restricted queue, this method is generally
      * preferable to {@link #add}, which can fail to insert an element only
      * by throwing an exception.
-	 * @param e Element that should be added
 	 * @param time Time at which the new element should become available
+	 * @param e Element that should be added
 	 * @return {@code true} if the element was added to this queue, else
      *         {@code false}
      * @throws ClassCastException if the class of the specified element
@@ -111,5 +111,5 @@ public interface ScheduledQueue<E> extends Queue<E> {
      * @throws IllegalArgumentException if some property of the specified
      *         element prevents it from being added to this queue
 	 */
-	public boolean offerAt(E e, long time);
+	public boolean offerAt(long time, E e);
 }
