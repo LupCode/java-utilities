@@ -577,9 +577,9 @@ public class ScheduledLinkedBlockingQueue<E> implements ScheduledBlockingQueue<E
 		timeout = unit.toMillis(timeout);
 		lock.writeLock().lock();
 		try {
-			long start = System.currentTimeMillis(), wait;
+			long start = System.currentTimeMillis(), wait=Math.max(0, timeout);
 			Entry<Long, Queue<E>> first = null;
-			while(first == null && (wait = timeout-(System.currentTimeMillis()-start)) > 0) {
+			do {
 				first = elements.firstEntry();
 				if(first == null) {
 					condNotEmpty.await(wait, TimeUnit.MILLISECONDS);
@@ -590,7 +590,7 @@ public class ScheduledLinkedBlockingQueue<E> implements ScheduledBlockingQueue<E
 					condNotEmpty.await(Math.min(wait, first.getKey()-now), TimeUnit.MILLISECONDS);
 					first = null;
 				}
-			}
+			} while(first == null && (wait = timeout-(System.currentTimeMillis()-start)) > 0);
 			if(first == null) return null;
 			try {
 				E e = first.getValue().remove();
@@ -601,7 +601,7 @@ public class ScheduledLinkedBlockingQueue<E> implements ScheduledBlockingQueue<E
 			} catch (Exception ex) {
 				elements.remove(first.getKey());
 			}
-			return null;
+			return wait > 0 ? poll(wait, TimeUnit.MILLISECONDS) : null;
 		} finally {
 			lock.writeLock().unlock();
 		}

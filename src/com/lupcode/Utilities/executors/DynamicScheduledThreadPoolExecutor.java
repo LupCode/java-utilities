@@ -79,12 +79,13 @@ public class DynamicScheduledThreadPoolExecutor extends DynamicThreadPoolExecuto
 	@Override
 	protected void updateThreadPool() {
 		if(free.get() > 0 || (maxSize > 0 && threads.size() >= maxSize)) return;
+		final ScheduledBlockingQueue<Runnable> queue = (ScheduledBlockingQueue<Runnable>) this.tasks;
 		Thread thread = new Thread(new Runnable() { public void run() {
 			boolean incremented = false;
 			do {
 				if(!incremented) { incremented=true; free.incrementAndGet(); }
 				try {
-					Runnable task = tasks.poll(keepAlive, timeUnit);
+					Runnable task = queue.poll(keepAlive, timeUnit);
 					if(task != null) {
 						if(incremented) { incremented=false; free.decrementAndGet(); }
 						updateThreadPool();
@@ -93,7 +94,7 @@ public class DynamicScheduledThreadPoolExecutor extends DynamicThreadPoolExecuto
 						} catch (Exception ex) { ex.printStackTrace(); }
 					}
 				} catch (InterruptedException e) {}
-			} while(!((ScheduledBlockingQueue<Runnable>)tasks).isCompletelyEmpty() || (!shutdown && threads.size() <= coreSize));
+			} while(!queue.isEmpty() || (!queue.isCompletelyEmpty() && threads.size() <= Math.max(1, coreSize)) || (!shutdown && threads.size() <= coreSize));
 			if(incremented) { incremented=false; free.decrementAndGet(); }
 			threadsLock.lock();
 			threads.remove(Thread.currentThread());
