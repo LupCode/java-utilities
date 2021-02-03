@@ -5,7 +5,6 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InterfaceAddress;
-import java.net.MulticastSocket;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.util.ArrayList;
@@ -24,6 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.lupcode.Utilities.concurrent.ConcurrentInteger;
 import com.lupcode.Utilities.executors.DynamicThreadPoolExecutor;
 import com.lupcode.Utilities.listeners.NetworkListener;
+import com.lupcode.Utilities.network.upnp.UPnPClient;
 
 public class NetworkUtils {
 
@@ -404,26 +404,23 @@ public class NetworkUtils {
 	}
 	
 	
-	public static void discoverUPnP() {
-		// IP and port for UPnP
-		try {
-			MulticastSocket socket = new MulticastSocket(1900);
-			socket.setReuseAddress(true);
-			socket.setSoTimeout(30000);
-			socket.joinGroup(InetAddress.getByName("239.255.255.250"));
-			
-			byte[] buffer = new byte[255];
-			while(!socket.isClosed()) {
-				DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-				socket.receive(packet);
-				System.out.println(new String(packet.getData(), packet.getOffset(), packet.getLength()));
-			}
-			
-			socket.close();
-			
-		} catch (IOException e) {
-			e.printStackTrace(); // TODO REMOVE
-		}
+	/**
+	 * Looks up all UPnP devices in the local network
+	 * @return Set containing addresses of found devices
+	 * @throws IOException if lookup failed
+	 */
+	public static Set<InetAddress> discoverUPnP() throws IOException {
+		return new UPnPClient().search();
+	}
+	
+	/**
+	 * Looks up all UPnP devices in the local network that match the given targets
+	 * @param searchTargets UPnP search targets
+	 * @return Set containing addresses of found devices
+	 * @throws IOException if lookup failed
+	 */
+	public static Set<InetAddress> discoverUPnP(String... searchTargets) throws IOException {
+		return new UPnPClient().search(searchTargets);
 	}
 	
 	
