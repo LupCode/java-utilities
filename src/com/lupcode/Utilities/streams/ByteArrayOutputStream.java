@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 /**
- * Same behavior as the {@link java.io.ByteArrayOutputStream} but allows 
+ * Same behavior as a {@link java.io.ByteArrayOutputStream} but allows 
  * direct access/manipulation of the buffer array
  * @author LupCode.com (Luca Vogels)
  * @since 2021-04-03

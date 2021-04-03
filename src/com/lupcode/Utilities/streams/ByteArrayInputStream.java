@@ -4,7 +4,7 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 
 /**
- * Same behavior as the {@link java.io.ByteArrayInputStream} but can dynamically handle 
+ * Same behavior as a {@link java.io.ByteArrayInputStream} but can dynamically handle 
  * multiple byte arrays.
  * @author LupCode.com (Luca Vogels)
  * @since 2021-04-03
