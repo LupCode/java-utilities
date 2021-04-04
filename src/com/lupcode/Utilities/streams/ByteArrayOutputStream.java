@@ -136,6 +136,19 @@ public class ByteArrayOutputStream extends OutputStream {
 		output.write(buffer, 0, offset);
 	}
 	
+	/**
+	 * Creates a {@link ByteArrayInputStream} that contains the data 
+	 * that was written to this {@link ByteArrayOutputStream}. 
+	 * This stream gets {@link ByteArrayOutputStream#reset()} so 
+	 * that it can be written again.
+	 * @return Stream that reads a copy of the data of this stream
+	 */
+	public synchronized ByteArrayInputStream toInputStream() {
+		ByteArrayInputStream input = new ByteArrayInputStream(buffer, 0, offset, true); // create copy of data
+		offset = 0; // reset this
+		return input;
+	}
+	
 	@Override
 	public String toString() {
 		return new StringBuilder(getClass().getSimpleName()).append("{size=").append(offset).
