@@ -39,8 +39,7 @@ public class OptionalDeflaterInputStream extends InputStream {
 	 * @throws NullPointerException if {@link InputStream} is null
 	 */
 	public OptionalDeflaterInputStream(InputStream input, Deflater deflater) throws NullPointerException {
-		if(input == null) throw new NullPointerException("InputStream cannot be null");
-		this.input = input;
+		setInputStream(input);
 		setDeflater(deflater);
 	}
 	
@@ -55,9 +54,26 @@ public class OptionalDeflaterInputStream extends InputStream {
 	 * @throws IllegalArgumentException if bufferSize < 1
 	 */
 	public OptionalDeflaterInputStream(InputStream input, Deflater deflater, int bufferSize) throws NullPointerException, IllegalArgumentException {
+		setInputStream(input);
+		setDeflater(deflater, bufferSize);
+	}
+	
+	/**
+	 * Returns the {@link InputStream} that is used as input for the deflater
+	 * @return {@link InputStream} used as input
+	 */
+	public InputStream getInputStream() {
+		return input;
+	}
+	
+	/**
+	 * Sets the {@link InputStream} that is used as input for the deflater
+	 * @param input Stream used as input for the deflater
+	 * @throws NullPointerException if {@link InputStream} is null
+	 */
+	public synchronized void setInputStream(InputStream input) throws NullPointerException {
 		if(input == null) throw new NullPointerException("InputStream cannot be null");
 		this.input = input;
-		setDeflater(deflater, bufferSize);
 	}
 	
 	/**

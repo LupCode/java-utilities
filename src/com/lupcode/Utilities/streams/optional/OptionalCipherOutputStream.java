@@ -24,10 +24,10 @@ public class OptionalCipherOutputStream extends OutputStream {
 	 * Creates a new {@link OptionalCipherOutputStream} instance that does not
 	 * cipher data until it gets enabled
 	 * @param output Stream that should be written to
+	 * @throws NullPointerException if {@link OutputStream} is null
 	 */
-	public OptionalCipherOutputStream(OutputStream output) {
-		if(output == null) throw new NullPointerException("OutputStream cannot be null");
-		this.output = output;
+	public OptionalCipherOutputStream(OutputStream output) throws NullPointerException {
+		setOutputStream(output);
 		this.cipherOutput = new CipherOutputStream(output, new NullCipher());
 	}
 	
@@ -37,10 +37,10 @@ public class OptionalCipherOutputStream extends OutputStream {
 	 * otherwise it won't start ciphering until it gets enabled later on
 	 * @param output Stream that should be written to
 	 * @param cipher Cipher that should be used for ciphering
+	 * @throws NullPointerException if {@link OutputStream} is null
 	 */
-	public OptionalCipherOutputStream(OutputStream output, Cipher cipher) {
-		if(output == null) throw new NullPointerException("OutputStream cannot be null");
-		this.output = output;
+	public OptionalCipherOutputStream(OutputStream output, Cipher cipher) throws NullPointerException {
+		setOutputStream(output);
 		this.doCipher = cipher != null;
 		setCipher(cipher);
 	}
@@ -50,11 +50,29 @@ public class OptionalCipherOutputStream extends OutputStream {
 	 * @param output Stream that should be written to
 	 * @param cipher Cipher that should be used for ciphering
 	 * @param doCipher If true then cipher will immediately take place otherwise it can be enabled later on
+	 * @throws NullPointerException if {@link OutputStream} is null
 	 */
-	public OptionalCipherOutputStream(OutputStream output, Cipher cipher, boolean doCipher) {
+	public OptionalCipherOutputStream(OutputStream output, Cipher cipher, boolean doCipher) throws NullPointerException {
+		setOutputStream(output);
+		setCipher(cipher, doCipher);
+	}
+	
+	/**
+	 * Returns the {@link OutputStream} that is used as output of the cipher
+	 * @return {@link OutputStream} used as output
+	 */
+	public OutputStream getOutputStream() {
+		return output;
+	}
+	
+	/**
+	 * Sets the {@link OutputStream} that is used as output of the cipher
+	 * @param output Stream used as output for the cipher
+	 * @throws NullPointerException if {@link OutputStream} is null
+	 */
+	public synchronized void setOutputStream(OutputStream output) throws NullPointerException {
 		if(output == null) throw new NullPointerException("OutputStream cannot be null");
 		this.output = output;
-		setCipher(cipher, doCipher);
 	}
 	
 	/**

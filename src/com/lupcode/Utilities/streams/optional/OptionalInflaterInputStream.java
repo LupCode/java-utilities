@@ -39,8 +39,7 @@ public class OptionalInflaterInputStream extends InputStream {
 	 * @throws NullPointerException if {@link InputStream} is null
 	 */
 	public OptionalInflaterInputStream(InputStream input, Inflater inflater) throws NullPointerException {
-		if(input == null) throw new NullPointerException("InputStream cannot be null");
-		this.input = input;
+		setInputStream(input);
 		setInflater(inflater);
 	}
 	
@@ -55,9 +54,26 @@ public class OptionalInflaterInputStream extends InputStream {
 	 * @throws IllegalArgumentException if bufferSize < 1
 	 */
 	public OptionalInflaterInputStream(InputStream input, Inflater inflater, int bufferSize) throws NullPointerException, IllegalArgumentException {
+		setInputStream(input);
+		setInflater(inflater, bufferSize);
+	}
+	
+	/**
+	 * Returns the {@link InputStream} that is used as input for the inflater
+	 * @return {@link InputStream} used as input
+	 */
+	public InputStream getInputStream() {
+		return input;
+	}
+	
+	/**
+	 * Sets the {@link InputStream} that is used as input for the inflater
+	 * @param input Stream used as input for the inflater
+	 * @throws NullPointerException if {@link InputStream} is null
+	 */
+	public synchronized void setInputStream(InputStream input) throws NullPointerException {
 		if(input == null) throw new NullPointerException("InputStream cannot be null");
 		this.input = input;
-		setInflater(inflater, bufferSize);
 	}
 	
 	/**
