@@ -13,6 +13,7 @@ public class ByteArrayOutputStream extends OutputStream {
 	
 	protected byte[] buffer;
 	protected int offset = 0;
+	protected boolean closed = false;
 	
 	/**
 	 * Creates a new {@link ByteArrayInputStream} instance 
@@ -80,12 +81,39 @@ public class ByteArrayOutputStream extends OutputStream {
 	public ByteArrayOutputStream clone() {
 		ByteArrayOutputStream clone = new ByteArrayOutputStream(buffer.length);
 		clone.offset = offset;
+		clone.closed = closed;
 		System.arraycopy(buffer, 0, clone.buffer, 0, buffer.length);
 		return clone;
 	}
 	
+	/**
+	 * @return True if stream has been closed
+	 */
+	public boolean isClosed() {
+		return closed;
+	}
+	
+	/**
+	 * Re-opens stream so it can be used with 
+	 * the same state before it got closed
+	 */
+	public void reopen() {
+		closed = false;
+	}
+	
+	@Override
+	public void close() {
+		closed = true;
+	}
+	
+	@Override
+	public void flush() {
+		
+	}
+	
 	@Override
 	public void write(int b) throws IOException {
+		if(closed) throw new IOException(getClass().getSimpleName()+" already closed");
 		checkCapacity(1);
 		buffer[offset] = (byte)b;
 		offset++;
@@ -110,6 +138,7 @@ public class ByteArrayOutputStream extends OutputStream {
 	@Override
 	public String toString() {
 		return new StringBuilder(getClass().getSimpleName()).append("{size=").append(offset).
-				append("; capacity=").append(buffer.length).append("}").toString();
+				append("; capacity=").append(buffer.length).append("; closed=").append(closed).
+				append("}").toString();
 	}
 }
