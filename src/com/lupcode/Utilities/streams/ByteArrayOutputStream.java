@@ -10,18 +10,16 @@ import java.io.OutputStream;
  * @since 2021-04-03
  */
 public class ByteArrayOutputStream extends OutputStream {
-
-	public static int DEFAULT_CAPACITY = 16;
 	
 	protected byte[] buffer;
 	protected int offset = 0;
 	
 	/**
 	 * Creates a new {@link ByteArrayInputStream} instance 
-	 * with an initial byte array size of {@link ByteArrayInputStream#DEFAULT_CAPACITY}
+	 * with an initial buffer size of zero
 	 */
 	public ByteArrayOutputStream() {
-		this(-1);
+		this(0);
 	}
 	
 	/**
@@ -29,7 +27,7 @@ public class ByteArrayOutputStream extends OutputStream {
 	 * @param initialCapacity Initial size of the byte array used to store the written data
 	 */
 	public ByteArrayOutputStream(int initialCapacity) {
-		this.buffer = new byte[initialCapacity >= 0 ? initialCapacity : DEFAULT_CAPACITY];
+		this.buffer = new byte[Math.max(0, initialCapacity)];
 	}
 	
 	protected void checkCapacity(int needed) {
