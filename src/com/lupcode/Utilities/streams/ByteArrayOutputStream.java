@@ -121,6 +121,7 @@ public class ByteArrayOutputStream extends OutputStream {
 	
 	@Override
 	public void write(byte[] b, int off, int len) throws IOException {
+		if(closed) throw new IOException(getClass().getSimpleName()+" already closed");
 		checkCapacity(len);
 		System.arraycopy(b, off, buffer, offset, len);
 		offset += len;
