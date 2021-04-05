@@ -63,6 +63,21 @@ public class ByteArrayOutputStream extends OutputStream {
 	}
 	
 	/**
+	 * Discards the first <code>n</code> bytes from the buffer 
+	 * and moves the rest of the valid bytes in the buffer 
+	 * to the beginning (to position 0 in the array)
+	 * @param n Amount of bytes that should be discarded
+	 * @throws IndexOutOfBoundsException if <code>n</code> is negative or greater than {@link ByteArrayOutputStream#size()}
+	 */
+	public void discard(int n) {
+		if(n < 0 || n > offset) throw new IndexOutOfBoundsException();
+		if(n == 0) return;
+		if(n == offset) { offset=0; return; }
+		System.arraycopy(buffer, n, buffer, 0, offset-n); // move data left in buffer to beginning
+		offset -= n;
+	}
+	
+	/**
 	 * @return Raw buffer (no copy)
 	 */
 	public byte[] array() {
@@ -141,12 +156,27 @@ public class ByteArrayOutputStream extends OutputStream {
 	 * Creates a {@link ByteArrayInputStream} that contains the data 
 	 * that was written to this {@link ByteArrayOutputStream}. 
 	 * This stream gets {@link ByteArrayOutputStream#reset()} so 
-	 * that it can be written again.
+	 * that it can be written again as it is a new instance.
 	 * @return Stream that reads a copy of the data of this stream
 	 */
-	public synchronized ByteArrayInputStream toInputStream() {
-		ByteArrayInputStream input = new ByteArrayInputStream(buffer, 0, offset, true); // create copy of data
-		offset = 0; // reset this
+	public ByteArrayInputStream toInputStream() {
+		return toInputStream(offset);
+	}
+	
+	/**
+	 * Creates a {@link ByteArrayInputStream} that contains the first <code>n</code> bytes  
+	 * that were written to this {@link ByteArrayOutputStream}.
+	 * Those <code>n</code> are discarded from this {@link ByteArrayOutputStream} 
+	 * by calling {@link ByteArrayOutputStream#discard(int)}
+	 * @param n Amount of bytes that should be readable in the {@link ByteArrayInputStream} 
+	 * and will be discarded from this {@link ByteArrayOutputStream}
+	 * @return Stream that reads a copy of the first <code>n</code> bytes of this stream
+	 * @throws IndexOutOfBoundsException if <code>n</code> is negative or greater than {@link ByteArrayOutputStream#size()}
+	 */
+	public synchronized ByteArrayInputStream toInputStream(int n) throws IndexOutOfBoundsException {
+		if(n < 0 || n > offset) throw new IndexOutOfBoundsException();
+		ByteArrayInputStream input = new ByteArrayInputStream(buffer, 0, n, true); // create copy of data
+		discard(n);
 		return input;
 	}
 	
