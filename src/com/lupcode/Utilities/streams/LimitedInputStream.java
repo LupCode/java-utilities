@@ -32,7 +32,17 @@ public class LimitedInputStream extends InputStream {
 	public LimitedInputStream(InputStream input, long remaining){
 		if(input==null){ throw new NullPointerException("InputStream cannot be null"); }
 		this.input = input;
-		remaining(remaining);
+		setLimit(remaining);
+	}
+	
+	/**
+	 * Returns how many bytes can be read until limit is reached at which 
+	 * the {@link LimitedInputStream#read()} only returns -2.
+	 * Negative values means no limit set
+	 * @return Amount of readable bytes or negative if no limit
+	 */
+	public long remaining() {
+		return remaining;
 	}
 	
 	/**
@@ -47,18 +57,8 @@ public class LimitedInputStream extends InputStream {
 	 * @param remaining Amount of bytes that can be read until limit is 
 	 * reached and {@link LimitedInputStream#read()} returns -2 (negative means no limit)
 	 */
-	public void remaining(long remaining) {
+	public void setLimit(long remaining) {
 		this.remaining = Math.max(-1, remaining);
-	}
-	
-	/**
-	 * Returns how many bytes can be read until limit is reached at which 
-	 * the {@link LimitedInputStream#read()} only returns -2.
-	 * Negative values means no limit set
-	 * @return Amount of readable bytes or negative if no limit
-	 */
-	public long remaining() {
-		return remaining;
 	}
 	
 	/**
