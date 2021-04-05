@@ -36,6 +36,7 @@ public class ByteArrayOutputStream extends OutputStream {
 		if(needed > buffer.length) {
 			byte[] newBuf = new byte[needed];
 			System.arraycopy(buffer, 0, newBuf, 0, buffer.length);
+			this.buffer = newBuf;
 		}
 	}
 	
