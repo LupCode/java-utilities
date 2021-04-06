@@ -44,7 +44,7 @@ public class ByteArrayOutputStream extends OutputStream {
 	 * New writes will start at the beginning of the byte buffer 
 	 * and will overwrite already previously written data
 	 */
-	public void reset() {
+	public synchronized void reset() {
 		offset = 0;
 	}
 	
@@ -69,7 +69,7 @@ public class ByteArrayOutputStream extends OutputStream {
 	 * @param n Amount of bytes that should be discarded
 	 * @throws IndexOutOfBoundsException if <code>n</code> is negative or greater than {@link ByteArrayOutputStream#size()}
 	 */
-	public void discard(int n) {
+	public synchronized void discard(int n) {
 		if(n < 0 || n > offset) throw new IndexOutOfBoundsException();
 		if(n == 0) return;
 		if(n == offset) { offset=0; return; }
@@ -87,14 +87,14 @@ public class ByteArrayOutputStream extends OutputStream {
 	/**
 	 * @return Copy of buffer
 	 */
-	public byte[] toByteArray() {
+	public synchronized byte[] toByteArray() {
 		byte[] clone = new byte[buffer.length];
 		System.arraycopy(buffer, 0, clone, 0, offset);
 		return clone;
 	}
 	
 	@Override
-	public ByteArrayOutputStream clone() {
+	public synchronized ByteArrayOutputStream clone() {
 		ByteArrayOutputStream clone = new ByteArrayOutputStream(buffer.length);
 		clone.offset = offset;
 		clone.closed = closed;
@@ -128,7 +128,7 @@ public class ByteArrayOutputStream extends OutputStream {
 	}
 	
 	@Override
-	public void write(int b) throws IOException {
+	public synchronized void write(int b) throws IOException {
 		if(closed) throw new IOException(getClass().getSimpleName()+" already closed");
 		checkCapacity(1);
 		buffer[offset] = (byte)b;
@@ -136,7 +136,7 @@ public class ByteArrayOutputStream extends OutputStream {
 	}
 	
 	@Override
-	public void write(byte[] b, int off, int len) throws IOException {
+	public synchronized void write(byte[] b, int off, int len) throws IOException {
 		if(closed) throw new IOException(getClass().getSimpleName()+" already closed");
 		checkCapacity(len);
 		System.arraycopy(b, off, buffer, offset, len);
@@ -148,7 +148,7 @@ public class ByteArrayOutputStream extends OutputStream {
 	 * @param output Stream the data should be written to
 	 * @throws IOException If writing fails
 	 */
-	public void writeTo(OutputStream output) throws IOException {
+	public synchronized void writeTo(OutputStream output) throws IOException {
 		output.write(buffer, 0, offset);
 	}
 	
