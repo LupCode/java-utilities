@@ -32,7 +32,7 @@ public class ByteArrayOutputStream extends OutputStream {
 	}
 	
 	protected void checkCapacity(int needed) {
-		needed = buffer.length - offset + needed;
+		needed += offset;
 		if(needed > buffer.length) {
 			byte[] newBuf = new byte[needed];
 			System.arraycopy(buffer, 0, newBuf, 0, buffer.length);
