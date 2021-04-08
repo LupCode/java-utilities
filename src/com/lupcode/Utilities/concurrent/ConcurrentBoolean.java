@@ -84,9 +84,10 @@ public class ConcurrentBoolean implements Serializable {
     
     /**
      * Waits until this value is true
+     * @return Current value
      */
-    public void awaitTrue() {
-    	await(i -> i==true);
+    public boolean awaitTrue() {
+    	return await(i -> i==true);
     }
     
     /**
@@ -101,9 +102,10 @@ public class ConcurrentBoolean implements Serializable {
     
     /**
      * Waits until this value is false
+     * @return Current value
      */
-    public void awaitFalse() {
-    	await(i -> i==false);
+    public boolean awaitFalse() {
+    	return await(i -> i==false);
     }
     
     /**
@@ -118,10 +120,11 @@ public class ConcurrentBoolean implements Serializable {
     
     /**
      * Waits until this value has changed
+     * @return Current value
      */
-    public void awaitChange() {
+    public boolean awaitChange() {
     	final boolean v = get();
-    	await(i -> i!=v);
+    	return await(i -> i!=v);
     }
     
     /**
@@ -139,12 +142,14 @@ public class ConcurrentBoolean implements Serializable {
      * Waits until the given function returns true for the current value
      * @param func Function that repeatedly gets called with current value 
      * and must return true in order to finish waiting
+     * @return Current value
      * @throws NullPointerException if the function is null
      */
-    public synchronized void await(Function<Boolean, Boolean> func) throws NullPointerException {
+    public synchronized boolean await(Function<Boolean, Boolean> func) throws NullPointerException {
     	if(func == null) throw new NullPointerException("Function cannot be null");
     	while(!func.apply(get()))
     		try { wait(); } catch (Exception ex) { ex.printStackTrace(); }
+    	return get();
     }
     
     /**

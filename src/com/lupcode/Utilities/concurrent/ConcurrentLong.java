@@ -237,9 +237,10 @@ public class ConcurrentLong extends Number implements Serializable {
     
     /**
      * Waits until this value equals zero
+     * @return Current value
      */
-    public void awaitZero() {
-    	await(i -> i==0);
+    public long awaitZero() {
+    	return await(i -> i==0);
     }
     
     /**
@@ -254,9 +255,10 @@ public class ConcurrentLong extends Number implements Serializable {
     
     /**
      * Waits until this value equals zero
+     * @return Current value
      */
-    public void awaitNotZero() {
-    	await(i -> i!=0);
+    public long awaitNotZero() {
+    	return await(i -> i!=0);
     }
     
     /**
@@ -272,9 +274,10 @@ public class ConcurrentLong extends Number implements Serializable {
     /**
      * Waits until this value equals the given value
      * @param value Value for checking
+     * @return Current value
      */
-    public void awaitEquals(long value) {
-    	await(i -> i==value);
+    public long awaitEquals(long value) {
+    	return await(i -> i==value);
     }
     
     /**
@@ -291,9 +294,10 @@ public class ConcurrentLong extends Number implements Serializable {
     /**
      * Waits until this value does not equal the given value
      * @param value Value for checking
+     * @return Current value
      */
-    public void awaitNotEquals(long value) {
-    	await(i -> i!=value);
+    public long awaitNotEquals(long value) {
+    	return await(i -> i!=value);
     }
     
     /**
@@ -310,9 +314,10 @@ public class ConcurrentLong extends Number implements Serializable {
     /**
      * Waits until this value is smaller or equals the given value
      * @param value Value for checking
+     * @return Current value
      */
-    public void awaitSmallerEquals(long value) {
-    	await(i -> i<=value);
+    public long awaitSmallerEquals(long value) {
+    	return await(i -> i<=value);
     }
     
     /**
@@ -329,9 +334,10 @@ public class ConcurrentLong extends Number implements Serializable {
     /**
      * Waits until this value is greater or equals the given value
      * @param value Value for checking
+     * @return Current value
      */
-    public void awaitGreaterEquals(long value) {
-    	await(i -> i>=value);
+    public long awaitGreaterEquals(long value) {
+    	return await(i -> i>=value);
     }
     
     /**
@@ -348,9 +354,10 @@ public class ConcurrentLong extends Number implements Serializable {
     /**
      * Waits until this value is smaller than the given value
      * @param value Value for checking
+     * @return Current value
      */
-    public void awaitSmaller(long value) {
-    	await(i -> i<value);
+    public long awaitSmaller(long value) {
+    	return await(i -> i<value);
     }
     
     /**
@@ -367,9 +374,10 @@ public class ConcurrentLong extends Number implements Serializable {
     /**
      * Waits until this value is greater than the given value
      * @param value Value for checking
+     * @return Current value
      */
-    public void awaitGreater(long value) {
-    	await(i -> i>value);
+    public long awaitGreater(long value) {
+    	return await(i -> i>value);
     }
     
     /**
@@ -385,10 +393,11 @@ public class ConcurrentLong extends Number implements Serializable {
     
     /**
      * Waits until this value has changed
+     * @return Current value
      */
-    public void awaitChange() {
+    public long awaitChange() {
     	final long v = get();
-    	await(i -> i!=v);
+    	return await(i -> i!=v);
     }
     
     /**
@@ -406,12 +415,14 @@ public class ConcurrentLong extends Number implements Serializable {
      * Waits until the given function returns true for the current value
      * @param func Function that repeatedly gets called with current value 
      * and must return true in order to finish waiting
+     * @return Current value
      * @throws NullPointerException if the function is null
      */
-    public synchronized void await(Function<Long, Boolean> func) throws NullPointerException {
+    public synchronized long await(Function<Long, Boolean> func) throws NullPointerException {
     	if(func == null) throw new NullPointerException("Function cannot be null");
     	while(!func.apply(get()))
     		try { wait(); } catch (Exception ex) { ex.printStackTrace(); }
+    	return get();
     }
     
     /**
