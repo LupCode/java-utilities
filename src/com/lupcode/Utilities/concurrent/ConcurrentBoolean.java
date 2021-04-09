@@ -1,7 +1,11 @@
 package com.lupcode.Utilities.concurrent;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
 /**
@@ -10,7 +14,7 @@ import java.util.function.Function;
  * @author LupCode.com (Luca Vogels)
  * @since 2021-01-03
  */
-public class ConcurrentBoolean implements Serializable {
+public class ConcurrentBoolean extends Number implements Serializable {
 
 	private static final long serialVersionUID = 1L;
 
@@ -31,6 +35,55 @@ public class ConcurrentBoolean implements Serializable {
         this.value.set(initialValue);
     }
 
+    @Override
+    public byte byteValue() {
+    	return (byte) (value.get() ? 1 : 0);
+    }
+    
+    @Override
+	public int intValue() {
+    	return value.get() ? 1 : 0;
+	}
+
+	@Override
+	public long longValue() {
+		return value.get() ? 1 : 0;
+	}
+
+	@Override
+	public float floatValue() {
+		return value.get() ? 1 : 0;
+	}
+
+	@Override
+	public double doubleValue() {
+		return value.get() ? 1 : 0;
+	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		if(obj == null) return value.equals(new AtomicBoolean(false));
+		if(obj instanceof ConcurrentBoolean) return value.equals((((ConcurrentBoolean)obj).value));
+		if(obj instanceof AtomicBoolean) return value.equals((AtomicBoolean)obj);
+		if(obj instanceof Boolean) return value.equals(new AtomicBoolean((Boolean)obj));
+		if(obj instanceof ConcurrentBigInteger) return value.equals(new AtomicBoolean(!((ConcurrentBigInteger)obj).equals(ConcurrentBigInteger.ZERO())));
+		if(obj instanceof BigInteger) return value.equals(new AtomicBoolean(!((BigInteger)obj).equals(BigInteger.ZERO)));
+		if(obj instanceof ConcurrentBigDecimal) return value.equals(new AtomicBoolean(!((ConcurrentBigDecimal)obj).equals(ConcurrentBigDecimal.ZERO())));
+		if(obj instanceof BigDecimal) return value.equals(new AtomicBoolean(!((BigDecimal)obj).equals(BigDecimal.ZERO)));
+		if(obj instanceof ConcurrentLong) return value.equals(new AtomicBoolean(((ConcurrentLong)obj).longValue() != 0));
+		if(obj instanceof AtomicLong) return value.equals(new AtomicBoolean(((AtomicLong)obj).longValue() != 0));
+		if(obj instanceof Long) return value.equals(new AtomicBoolean((Long)obj != 0));
+		if(obj instanceof ConcurrentInteger) return value.equals(new AtomicBoolean(((ConcurrentInteger)obj).intValue() != 0));
+		if(obj instanceof AtomicInteger) return value.equals(new AtomicBoolean(((AtomicInteger)obj).intValue() != 0));
+		if(obj instanceof Integer) return value.equals(new AtomicBoolean((Integer)obj != 0));
+		if(obj instanceof Double) return value.equals(new AtomicBoolean((Double)obj != 0));
+		if(obj instanceof Float) return value.equals(new AtomicBoolean((Float)obj != 0));
+		if(obj instanceof Short) return value.equals(new AtomicBoolean((Short)obj != 0));;
+		if(obj instanceof Byte) return value.equals(new AtomicBoolean((Byte)obj != 0));;
+		if(obj instanceof Number) return value.equals(new AtomicBoolean(((Number)obj).byteValue() != 0));;
+		return this.value.equals(obj);
+	}
+    
     /**
      * Returns the current value.
      * @return the current value

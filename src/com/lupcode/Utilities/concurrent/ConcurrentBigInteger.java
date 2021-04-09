@@ -1,17 +1,20 @@
 package com.lupcode.Utilities.concurrent;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 /**
- * Same behavior as {@link AtomicInteger} but using an {@link BigInteger} 
- * and additionally allows threads to wait until certain values get reached
+ * Thread-safe {@link BigInteger} with additional functionality such as 
+ * allowing threads to wait until a certain value gets reached
  * @author LupCode.com (Luca Vogels)
  * @since 2021-04-08
  */
@@ -228,7 +231,26 @@ public class ConcurrentBigInteger extends Number implements Serializable {
 	
 	@Override
 	public boolean equals(Object obj) {
-		return value.equals((obj!=null && obj instanceof ConcurrentBigInteger) ? ((ConcurrentBigInteger)obj).value : obj);
+		if(obj == null) return value.equals(BigInteger.ZERO);
+		if(obj instanceof ConcurrentBigInteger) return value.equals(((ConcurrentBigInteger)obj).value);
+		if(obj instanceof BigInteger) return value.equals((BigInteger)obj);
+		if(obj instanceof ConcurrentBigDecimal) return new BigDecimal(value).equals(((ConcurrentBigDecimal)obj).value);
+		if(obj instanceof BigDecimal) return new BigDecimal(value).equals(obj);
+		if(obj instanceof ConcurrentLong) return value.equals(BigInteger.valueOf(((ConcurrentLong)obj).longValue()));
+		if(obj instanceof AtomicLong) return value.equals(BigInteger.valueOf(((AtomicLong)obj).longValue()));
+		if(obj instanceof Long) return value.equals(BigInteger.valueOf((Long)obj));
+		if(obj instanceof ConcurrentInteger) return value.equals(BigInteger.valueOf(((ConcurrentInteger)obj).intValue()));
+		if(obj instanceof AtomicInteger) return value.equals(BigInteger.valueOf(((AtomicInteger)obj).intValue()));
+		if(obj instanceof Integer) return value.equals(BigInteger.valueOf((Integer)obj));
+		if(obj instanceof Double) return new BigDecimal(value).equals(new BigDecimal((Double)obj));
+		if(obj instanceof Float) return new BigDecimal(value).equals(new BigDecimal((Float)obj));
+		if(obj instanceof Short) return value.equals(BigInteger.valueOf((Short)obj));
+		if(obj instanceof Byte) return value.equals(BigInteger.valueOf((Byte)obj));
+		if(obj instanceof ConcurrentBoolean) return value.equals(BigInteger.valueOf(((ConcurrentBoolean)obj).intValue()));
+		if(obj instanceof AtomicBoolean) return value.equals(BigInteger.valueOf(((AtomicBoolean)obj).get() ? 1 : 0));
+		if(obj instanceof Boolean) return value.equals(BigInteger.valueOf(((Boolean)obj) ? 1 : 0));
+		if(obj instanceof Number) return value.equals(BigInteger.valueOf(((Number)obj).longValue()));
+		return this.value.equals(obj);
 	}
 	
 	/**
@@ -852,6 +874,7 @@ public class ConcurrentBigInteger extends Number implements Serializable {
     	}
     }
 	
+    
 	
 	
 	
@@ -1060,7 +1083,6 @@ public class ConcurrentBigInteger extends Number implements Serializable {
     		try { wait(budget); } catch (Exception ex) { ex.printStackTrace(); }
     	} return get();
     }
-	
 	
 	
 	

@@ -1,7 +1,11 @@
 package com.lupcode.Utilities.concurrent;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.function.IntBinaryOperator;
 import java.util.function.IntUnaryOperator;
@@ -233,6 +237,29 @@ public class ConcurrentInteger extends Number implements Serializable {
         return (double)get();
     }
     
+    @Override
+    public boolean equals(Object obj) {
+    	if(obj == null) return value.equals(new AtomicInteger(0));
+    	if(obj instanceof ConcurrentInteger) return value.equals(((ConcurrentInteger)obj).value);
+		if(obj instanceof AtomicInteger) return value.equals((AtomicInteger)obj);
+		if(obj instanceof Integer) return value.equals(new AtomicInteger((Integer)obj));
+		if(obj instanceof ConcurrentBigInteger) return value.equals(new AtomicInteger(((ConcurrentBigInteger)obj).intValue()));
+		if(obj instanceof BigInteger) return value.equals(new AtomicInteger(((BigInteger)obj).intValue()));
+		if(obj instanceof ConcurrentBigDecimal) return value.equals(new AtomicInteger(((ConcurrentBigDecimal)obj).intValue()));
+		if(obj instanceof BigDecimal) return value.equals(new AtomicInteger(((BigDecimal)obj).intValue()));
+		if(obj instanceof ConcurrentLong) return value.equals(new AtomicInteger(((ConcurrentLong)obj).intValue()));
+		if(obj instanceof AtomicLong) return value.equals(new AtomicInteger(((AtomicLong)obj).intValue()));
+		if(obj instanceof Long) return value.equals(new AtomicInteger(((Long)obj).intValue()));
+		if(obj instanceof Double) return value.equals(new AtomicInteger(((Double)obj).intValue()));
+		if(obj instanceof Float) return value.equals(new AtomicInteger(((Float)obj).intValue()));
+		if(obj instanceof Short) return value.equals(new AtomicInteger(((Short)obj).intValue()));
+		if(obj instanceof Byte) return value.equals(new AtomicInteger(((Byte)obj).intValue()));
+		if(obj instanceof ConcurrentBoolean) return value.equals(new AtomicInteger(((ConcurrentBoolean)obj).get() ? 1 : 0));
+		if(obj instanceof AtomicBoolean) return value.equals(new AtomicInteger(((AtomicBoolean)obj).get() ? 1 : 0));
+		if(obj instanceof Boolean) return value.equals(new AtomicInteger((Boolean)obj ? 1 : 0));
+		if(obj instanceof Number) return value.equals(new AtomicInteger(((Number)obj).intValue()));
+		return this.value.equals(obj);
+    }
 
     
     /**
